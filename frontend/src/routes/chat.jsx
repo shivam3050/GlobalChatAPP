@@ -53,7 +53,7 @@ export const ChatSection = (props) => {
                     return (
                         <div
                         
-                            className={(item.senderId === props.userRef.current.id) ? "bakground-gradient-in-chat" : ""} 
+                            className={(item.senderId === props.userRef.current.id) ? "background-gradient-in-chat" : ""} 
                         style={
                             {
 

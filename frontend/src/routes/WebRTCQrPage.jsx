@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import {  useRef } from 'react'
 
 
 
@@ -227,6 +227,12 @@ const WebRTCQrPage = (props) => {
 
         const divField = document.createElement("div")
 
+
+
+        divField.style.alignSelf = (sender === "You") ? ("flex-end") : ("flex-start")
+
+        if (sender === "You") divField.classList.add("background-gradient-in-chat")
+
         const divB = document.createElement("div")
         divB.textContent = `${sender}:`
 
@@ -238,7 +244,12 @@ const WebRTCQrPage = (props) => {
 
         chatBox.appendChild(divField)
 
-        chatBox.scrollTop = chatBox.scrollHeight;
+        // chatBox.scrollTop = chatBox.scrollHeight;
+
+        chatBox.scrollTo({
+            top: chatBox.scrollHeight,
+            behavior: "smooth"
+        });
     }
 
 
@@ -250,11 +261,11 @@ const WebRTCQrPage = (props) => {
 
                 <h2 style={{ display: props.localConnectionStatus ? "flex" : "none", justifyContent: "center", visibility: "visible" }}>connected</h2>
 
-                <button style={{ display: "flex", justifyContent: "center", maxWidth: "340px", fontSize: "16px", visibility: props.localConnectionStatus ? "hidden" : "visible" }} onClick={startCaller}>
+                <button style={{ display: "flex", justifyContent: "center", maxWidth: "340px", fontSize: "16px", visibility: props.localConnectionStatus ? "hidden" : "visible", backgroundColor:"var(--professional-blue)" }} onClick={startCaller}>
                     1. Create Offer</button>
-            
+
                 <button
-                    style={{ backgroundColor: "var(--professional-blue)", textShadow: "0px 0px 10px white", position: "relative", borderRadius: "50%", maxWidth: "50px",width: "50px", height: "50px", display: "flex", justifyContent: "center", alignItems: "center", top: "0", transform: "translateX(-50%)" }}
+                    style={{ backgroundColor: "red", textShadow: "0px 0px 10px white", position: "relative", borderRadius: "50%", maxWidth: "50px", width: "50px", height: "50px", display: "flex", justifyContent: "center", alignItems: "center", top: "0" }}
                     onClick={() => {
 
                         // const formData = new FormData(document.getElementById("register-form"));
@@ -262,8 +273,8 @@ const WebRTCQrPage = (props) => {
                         props.setLocaluser(prev => !prev)
                     }}
                 >
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-phone-flip" viewBox="0 0 16 16">
-                        <path fill-rule="evenodd" d="M11 1H5a1 1 0 0 0-1 1v6a.5.5 0 0 1-1 0V2a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v6a.5.5 0 0 1-1 0V2a1 1 0 0 0-1-1m1 13a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-2a.5.5 0 0 0-1 0v2a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2v-2a.5.5 0 0 0-1 0zM1.713 7.954a.5.5 0 1 0-.419-.908c-.347.16-.654.348-.882.57C.184 7.842 0 8.139 0 8.5c0 .546.408.94.823 1.201.44.278 1.043.51 1.745.696C3.978 10.773 5.898 11 8 11q.148 0 .294-.002l-1.148 1.148a.5.5 0 0 0 .708.708l2-2a.5.5 0 0 0 0-.708l-2-2a.5.5 0 1 0-.708.708l1.145 1.144L8 10c-2.04 0-3.87-.221-5.174-.569-.656-.175-1.151-.374-1.47-.575C1.012 8.639 1 8.506 1 8.5c0-.003 0-.059.112-.17.115-.112.31-.242.6-.376Zm12.993-.908a.5.5 0 0 0-.419.908c.292.134.486.264.6.377.113.11.113.166.113.169s0 .065-.13.187c-.132.122-.352.26-.677.4-.645.28-1.596.523-2.763.687a.5.5 0 0 0 .14.99c1.212-.17 2.26-.43 3.02-.758.38-.164.713-.357.96-.587.246-.229.45-.537.45-.919 0-.362-.184-.66-.412-.883s-.535-.411-.882-.571M7.5 2a.5.5 0 0 0 0 1h1a.5.5 0 0 0 0-1z" />
+                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="currentColor" class="bi bi-x-lg" viewBox="0 0 16 16">
+                        <path d="M2.146 2.854a.5.5 0 1 1 .708-.708L8 7.293l5.146-5.147a.5.5 0 0 1 .708.708L8.707 8l5.147 5.146a.5.5 0 0 1-.708.708L8 8.707l-5.146 5.147a.5.5 0 0 1-.708-.708L7.293 8z" />
                     </svg>
                 </button>
 
@@ -275,7 +286,7 @@ const WebRTCQrPage = (props) => {
                     // first like chat section
                     <div className="user-vs-chat-container" style={{ height: "100%" }}>
 
-                        <div id="chat" ref={localChatRef}>
+                        <div style={{ display: "flex", flexDirection: "column" }} id="chat" ref={localChatRef}>
 
 
 
@@ -284,7 +295,7 @@ const WebRTCQrPage = (props) => {
                         <div>
                             <div>
 
-                                <input ref={localMsgCreateRef} type="text" placeholder="Type message..." />
+                                <textarea ref={localMsgCreateRef} placeholder="Type message..." ></textarea>
                             </div>
                             <div>
 

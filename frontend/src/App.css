@@ -779,10 +779,11 @@ input[type="password"]:focus {
 
     /* these are chats fields */
     /* height: max-content; */
-    width: 80%;
+    max-width: 80%;
+    width: max-content;
     position: relative;
     padding-block: var(--med-padding);
-    padding-inline: var(--med-padding);
+    padding-inline: var(--max-padding);
     margin-bottom: var(--max-margin);
     background-color: var(--light-black);
     display: flex;
@@ -801,7 +802,7 @@ input[type="password"]:focus {
 
 }
 
-.bakground-gradient-in-chat {
+.background-gradient-in-chat {
     background: linear-gradient(to bottom, #9f4fac, #676bf1);
     background-attachment: fixed;
     background-size: auto calc(100% - var(--offset-for-keyboard));
@@ -1204,16 +1205,27 @@ input[type="password"]:focus {
 .web-rtc-page > :nth-child(2) .code-description{
     min-height: 100px;
 }
+.web-rtc-page legend {
+    
+    font-weight: bolder;
+    font-size: 16px;
+    user-select: none;
+}
 .web-rtc-page legend:active, .web-rtc-page button:active {
     transition: transform 0.4s ease;
 }
-.web-rtc-page legend:active  {
-    background-color: #000000;
-    transform: scale(0.9);
+.web-rtc-page legend:hover  {
+    background-color: rgba(30, 30, 30, 0.5);
+    transition: background-color 0.4s ease;
+    transform: scale(1);
 }
 .web-rtc-page button:active  {
     
     transform: scale(0.98);
+}
+.web-rtc-page legend:active  {
+    background-color: var(--darkest-black-user);
+    transform: scale(0.9);
 }
 
 .any-label {

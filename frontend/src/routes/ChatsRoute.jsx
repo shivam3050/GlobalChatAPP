@@ -96,7 +96,7 @@ function ChatsRoute(props) {
 
                     chatField.appendChild(chatStatusField)
 
-                    chatField.classList.add("bakground-gradient-in-chat")
+                    chatField.classList.add("background-gradient-in-chat")
 
                     chatsDiv.appendChild(chatField)
 
