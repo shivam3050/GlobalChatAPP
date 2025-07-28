@@ -47,7 +47,7 @@ function App() {
 
 
   // for local
-  const [localuser, setLocaluser] = useState(null)
+  const [localuser, setLocaluser] = useState(false)
 
   const peerRef = useRef(null);
 

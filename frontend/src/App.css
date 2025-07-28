@@ -1190,6 +1190,16 @@ input[type="password"]:focus {
     background-color: transparent;
     row-gap: var(--max-margin);
 }
+.user-vs-chat-container-like-with-qr-part::after{
+    display: block;
+    content: "Steps for local offline connection:\A\. Click Create Offer from any one device once (Say Device-A)\A\. Copy Code (Device-A)\A\. Paste Code on other device and click Consume Offer (Say Device-B)\A\. Then Copy code from other device (Device-B) and paste in previous device (Device-A)\A\. Click Finalize (Device-A)";
+    font-family: monospace;
+    font-style: italic;
+    font-weight: bolder;
+    white-space: pre-line;
+    text-shadow: 0px 0px 1px rgb(0, 0, 0);
+    color: var(--extra-light-grey);
+}
 
 .web-rtc-page > :nth-child(2) .code-description{
     min-height: 100px;
@@ -1238,6 +1248,12 @@ input[type="password"]:focus {
 .display {
     display: block;
 }
+
+.rotateY {
+  transform: rotateY(180deg);
+  transform-style: preserve-3d;
+}
+
 
 
 @media (max-height:450px) and (min-width:450px) {
