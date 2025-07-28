@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Modular WebRTC Text Chat</title>
+    <style>
+        textarea {
+            width: 100%;
+            height: 100px;
+        }
+
+        button {
+            width: 49%;
+            padding: 10px;
+            margin-top: 5px;
+        }
+
+        #chat {
+            border: 1px solid #aaa;
+            height: 200px;
+            overflow-y: auto;
+            padding: 5px;
+            margin-top: 10px;
+        }
+    </style>
+</head>
+
+<body>
+    <h2>Manual WebRTC Text Chat (No Server)</h2>
+
+    <!-- Buttons -->
+    <div>
+        <button onclick="startCaller()">Create Offer</button>
+        <button onclick="startReceiver()">Create Answer</button>
+    </div>
+
+    <!-- Signaling -->
+    <h4>Local Description (Offer/Answer):</h4>
+    <textarea id="localDesc" readonly></textarea>
+
+    <h4>Paste Remote Description:</h4>
+    <textarea id="remoteDesc"></textarea>
+    <button onclick="applyRemoteDescription()">Set Remote Description</button>
+
+    <!-- Chat -->
+    <div id="chat"></div>
+    <input type="text" id="msgInput" placeholder="Type message..." style="width: 80%;">
+    <button onclick="sendMessage()">Send</button>
+
+    <script>
+        let peer = null;
+        let callerChannel = null;
+        let receiverChannel = null;
+
+        function createPeerConnection() {
+            peer = new RTCPeerConnection();
+            peer.onicecandidate = handleICECandidate;
+            peer.ondatachannel = handleIncomingChannel;
+        }
+
+        function handleICECandidate(event) {
+            if (!event.candidate) {
+                updateLocalDesc(peer.localDescription);
+            }
+        }
+
+        function handleIncomingChannel(event) {
+            receiverChannel = event.channel;
+            setupReceiverHandlers();
+        }
+
+        function createDataChannel() {
+            callerChannel = peer.createDataChannel("chat");
+            setupCallerHandlers();
+        }
+
+        function setupCallerHandlers() {
+            callerChannel.onmessage = (e) => {
+                appendChatMessage("Anonymous", e.data);
+            };
+        }
+
+        function setupReceiverHandlers() {
+            receiverChannel.onmessage = (e) => {
+                appendChatMessage("Anonymous", e.data);
+            };
+        }
+
+        function updateLocalDesc(desc) {
+            document.getElementById('localDesc').value = JSON.stringify(desc);
+        }
+
+        async function startCaller() {
+            createPeerConnection(); // creating peer object in caller
+            createDataChannel();
+            const offer = await peer.createOffer();
+            await peer.setLocalDescription(offer);
+        }
+
+        async function startReceiver() {
+            createPeerConnection(); // creating peer object in receiver
+            const remoteDesc = getRemoteDesc();   // getting the code from caller
+            await peer.setRemoteDescription(new RTCSessionDescription(remoteDesc));
+            const answer = await peer.createAnswer();
+            await peer.setLocalDescription(answer);
+        }
+
+        async function applyRemoteDescription() {
+            const remoteDesc = getRemoteDesc();  // getting the code from receiver which is pasted
+            await peer.setRemoteDescription(new RTCSessionDescription(remoteDesc));
+            alert("Remote description set.");
+        }
+
+        function getRemoteDesc() {
+            return JSON.parse(document.getElementById('remoteDesc').value);
+        }
+
+        function sendMessage() {
+            const input = document.getElementById('msgInput');
+            const message = input.value.trim();
+            if (message !== '') {
+                if (callerChannel) {
+
+                    callerChannel.send(message);
+                    appendChatMessage("You", message);
+                    input.value = '';
+                    return
+                }
+                else if (receiverChannel) {
+
+                    receiverChannel.send(message);
+                    appendChatMessage("You", message);
+                    input.value = '';
+                    return
+                }
+                else return;
+
+
+            }
+        }
+
+        function appendChatMessage(sender, message) {
+            const chatBox = document.getElementById('chat');
+            chatBox.innerHTML += `<div><b>${sender}:</b> ${message}</div>`;
+            chatBox.scrollTop = chatBox.scrollHeight;
+        }
+    </script>
+</body>
+
+</html>
