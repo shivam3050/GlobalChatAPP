@@ -11,11 +11,11 @@ const messageSchema = new Schema({
   },
   content: {
     type: String,
-    required: true
+    // required: true
   },
   createdAt: {
     type: Number,
-    required: true
+    // required: true
   }
 },
 //  { timestamps: true }

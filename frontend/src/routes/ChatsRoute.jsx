@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import { ChatSection } from './chat';
 
 
@@ -6,6 +6,7 @@ function ChatsRoute(props) {
 
 
     const [selectedReceiver, setSelectedReceiver] = useState("")
+    
 
     useEffect(() => {
         if (props.userRef.current.focusedContact.username) {
@@ -107,11 +108,12 @@ function ChatsRoute(props) {
                         JSON.stringify(
                             {
                                 type: "message",
+                                
                                 message: message,
                                 createdAt: timestamp,
                                 receiver: props.userRef.current.focusedContact,
                                 // sender: { username: props.userRef.current.username, id: props.userRef.current.id, age: props.userRef.current.age, gender: props.userRef.current.gender, country: props.userRef.current.country }
-                                sender: { username: props.userRef.current.username, id: props.userRef.current.id,  country: props.userRef.current.country }
+                                sender: { username: props.userRef.current.username, id: props.userRef.current.id, country: props.userRef.current.country }
                             }
                         )
                     )
@@ -127,6 +129,34 @@ function ChatsRoute(props) {
                         spellCheck="false"
 
                         onFocus={(e) => { enableTextBoxOnBlur(e) }}
+
+                        // onInput={() => {
+
+                        //     clearTimeout(typingTimeoutRef.current);
+
+
+                        //     typingTimeoutRef.current = setTimeout(()=>{
+                                
+                        //         props.socketContainer.current.send(
+    
+                        //             JSON.stringify(
+                        //                 {
+                        //                     type: "message",
+                        //                     status:"typing",
+                        //                     // message: message,
+                        //                     // createdAt: timestamp,
+                        //                     receiver: props.userRef.current.focusedContact,
+                        //                     // sender: { username: props.userRef.current.username, id: props.userRef.current.id, age: props.userRef.current.age, gender: props.userRef.current.gender, country: props.userRef.current.country }
+                        //                     sender: { username: props.userRef.current.username, id: props.userRef.current.id, country: props.userRef.current.country }
+                        //                 }
+                        //             )
+                        //         )
+                        //     }, 400)
+                            
+
+                            
+
+                        // }}
 
 
                         style={{ resize: "none" }} placeholder={`Send to ${selectedReceiver}...`} name="message" maxLength="500">

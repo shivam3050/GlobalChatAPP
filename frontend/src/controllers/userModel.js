@@ -5,7 +5,16 @@ export const userRef = {
     // age: null,
     // gender: "",
     country: "",
-    availableConnectedUsersUnreadLength :0,
+    yourGlobalStarAiReference: {
+        username: "",
+        id: "",
+        // age: null,
+        // gender: "",
+        country: "",
+        isAiCallingOn: {instance:null,flag:false},
+        unread: false
+    },
+    availableConnectedUsersUnreadLength: 0,
     availableConnectedUsers: [
         {
             username: "",
@@ -13,6 +22,8 @@ export const userRef = {
             // age: null,
             // gender: "",
             country: "",
+            transcriptinput: "",
+            textoutput:"",
             unread: false
         }
     ],

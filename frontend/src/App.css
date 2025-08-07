@@ -1269,6 +1269,35 @@ input[type="password"]:focus {
   transform-style: preserve-3d;
 }
 
+@keyframes bouncingUpDown {
+    0% {
+        top: 0
+    }
+    50%{
+        top: 10px
+    }
+    100%{
+        top: 0
+    }
+}
+.bouncing-last-three-dots-animation > :nth-last-child(3) {
+    transition: top;
+    position: relative;
+    animation: bouncingUpDown 1.5s ease-out 0.4s infinite ;
+   
+}
+.bouncing-last-three-dots-animation > :nth-last-child(2) {
+    transition: top;
+    position: relative;
+    animation: bouncingUpDown 1.5s ease-out 0.2s infinite ;
+
+}
+.bouncing-last-three-dots-animation > :nth-last-child(1) {
+    transition: top;
+    position: relative;
+    animation: bouncingUpDown 1.5s ease-out 0s infinite ;
+}
+
 
 
 @media (max-height:450px) and (min-width:450px) {

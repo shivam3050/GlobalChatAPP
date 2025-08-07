@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react"
-import { Link, useNavigate } from "react-router-dom"
+import { aiProfile } from "../controllers/allCountries" 
+
 
 
 export const UserSection = (props) => {
@@ -13,6 +14,7 @@ export const UserSection = (props) => {
     useEffect(() => {
         if (props.userRef.current.availableUsers) {
             setUpdateAvailableUsersInUI(props.userRef.current.availableUsers)
+            
         }
 
         return
@@ -22,14 +24,6 @@ export const UserSection = (props) => {
 
 
 
-    // if (!props.userRef || !props.userRef.current.availableUsers || props.userRef.current.availableUsers.length === 0) {
-    //     return (<div className="any-label"
-    //         style={{ display: "flex", justifyContent: "center", alignItems: "center" }}
-    //     >
-    //         No users active
-
-    //     </div>)
-    // }
 
 
 
@@ -37,6 +31,7 @@ export const UserSection = (props) => {
         {
 
             updateAvailableUsersInUI.map((user, index) => {
+
                 return (
                     <div
                         onClick={
@@ -76,7 +71,7 @@ export const UserSection = (props) => {
                         }
                         key={index}>
                         <div style={{
-                            backgroundImage: `url("default_user_photo.png")`
+                            backgroundImage: (user.country==="nocountry") ? (`url(${aiProfile.profileImage})`): url("default_user_photo.png")
 
                         }}>
 
@@ -88,13 +83,13 @@ export const UserSection = (props) => {
                             <div>
                                 <section>
                                     {/* {`Age ${user.age} yrs`} */}
-                                    </section> <section>{user.country}</section>
+                                    </section> <section>{(user.country==="nocountry")?"":user.country}</section>
                                 
                                 
                             </div>
                         </div>
                         <div>
-                            <section style={{backgroundImage:`url(${props.CountryMap.get(user.country).png})`}}></section>
+                            <section style={{backgroundImage:`url(${props.CountryMap.get(user.country)?.png})`}}></section>
 
                         </div>
                     </div>

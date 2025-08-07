@@ -1,3 +1,7 @@
+export const aiProfile = {
+    profileImage: "starAIProfileImage.jpg"
+}
+
 export const countries = [
     {
         "countryName": "Algeria",

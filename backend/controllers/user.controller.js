@@ -3,6 +3,55 @@ import { Message } from "../db/message.model.js"
 import { WebSocketServer } from 'ws';
 import { parse } from "url"
 
+
+
+
+const requestChatToken = async (currentUserPrompt, fewHistory = null) => {
+
+    let contents = [
+
+        {
+            "role": "user",
+            "parts": [{ "text": currentUserPrompt }]
+        }
+    ]
+
+    if (Array.isArray(fewHistory) && fewHistory.length > 0) {
+        contents = [
+            ...fewHistory,
+            {
+                "role": "user",
+                "parts": [{ "text": currentUserPrompt }]
+            }
+        ]
+    }
+
+
+    const geminiChatModel = "gemini-2.5-flash";
+
+    const res = await fetch(`https://generativelanguage.googleapis.com/v1/models/${geminiChatModel}:generateContent?key=${process.env.GEMINI_API_KEY}`, {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+            "contents": contents
+        })
+    })
+
+    if (!res.ok) {
+        const errorData = await res.json()
+
+        return errorData?.error?.message
+
+    }
+    const data = await res.json()
+    
+    return data["candidates"][0]["content"]["parts"][0]["text"]
+
+
+}
+
 export const createNewOneChat = async (senderId, receiverId, content, createdAt) => {
     try {
         const message = await Message.create({
@@ -12,8 +61,8 @@ export const createNewOneChat = async (senderId, receiverId, content, createdAt)
             createdAt: createdAt
         })
         return message
-    } catch {
-
+    } catch (error) {
+        console.error(error)
         return null
     }
 }
@@ -66,6 +115,9 @@ export const deleteUserAllChats = async (userId) => {
 
 
 
+
+
+
 class Client {
     static counter = 0;
     static lastTimeStamp = 0;
@@ -74,16 +126,25 @@ class Client {
         username,
         //  age,
         //  gender,
-         country,
-         socket
+        country,
+        socket
     ) {
-        this.username = username,
+        this.username = username;
 
-            this.socket = socket,
-            // this.age = age,
-            // this.gender = gender,
-            this.country = country,
-            this.id = this.generateId()
+        this.socket = socket;
+        // this.age = age,
+        // this.gender = gender,
+        this.country = country;
+        this.id = this.generateId();
+
+        if (typeof socket === "string") {
+
+            this.textoutput = "";
+            this.transcriptinput = "";
+            this.isAiCallingOn = { instance: null, flag: false };
+
+        }
+        this.unread = false;
 
     }
 
@@ -113,6 +174,11 @@ class Client {
 
 
 const activeClients = new Map()
+
+// first client will be stars ai
+const StarAI = new Client("StarAI", "nocountry", "socket-to-StarAI")
+
+activeClients.set("StarAI", StarAI)
 
 export const newConnectionHandler = async (dbname, httpServer, allowedOrigin) => {
 
@@ -169,6 +235,12 @@ export const newConnectionHandler = async (dbname, httpServer, allowedOrigin) =>
         //     socket.close(1008, "age is less then 18")
         //     return
         // }
+        const reservedUsernames = ["StarAI", "StarAI", "StarAI", "stars_ai", "stars.ai"]
+
+        if (reservedUsernames.some(name => name === username)) {
+            socket.close(1008, "this is a reserved username")
+            return
+        }
         const user = activeClients.has(username)
 
         if (user) {
@@ -176,11 +248,16 @@ export const newConnectionHandler = async (dbname, httpServer, allowedOrigin) =>
             return
         }
         // const availableUsers = [...activeClients.entries()].map(([username, client], _, __) => ({ username: client.username, age: client.age, gender: client.gender, country: client.country, id: client.id }))
-        const availableUsers = [...activeClients.entries()].map(([username, client], _, __) => ({ username: client.username,  country: client.country, id: client.id }))
+        const availableUsers = [...activeClients.entries()].map(([username, client], _, __) => {
+
+            return { username: client.username, country: client.country, id: client.id, unread: false }
+        })
         // const client = new Client(username, age, gender, country, socket)
-        const client = new Client(username,  country, socket)
+        const client = new Client(username, country, socket)
 
         activeClients.set(username, client);
+
+
 
 
 
@@ -205,6 +282,7 @@ export const newConnectionHandler = async (dbname, httpServer, allowedOrigin) =>
             } catch (error) {
                 console.error(error)
             }
+
             const sender = data?.sender
             const receiver = data?.receiver
             const type = data?.type
@@ -215,27 +293,99 @@ export const newConnectionHandler = async (dbname, httpServer, allowedOrigin) =>
             if (!type) {
                 return console.error("type is not availbale")
             }
-            // if (type === "chatlistdemand") {
-            //     if (!sender || !receiver) {
-            //         return console.error("sender or recievr not provided")
-            //     }
 
-            //     socket.send(
-            //         JSON.stringify({
-            //             status: "success",
-            //             sender: sender,
-            //             reciever: receiver,
-            //             type: type,
-            //             msg: await getChatList(sender.id, receiver.id)
-            //         })
-            //     )
-            //     return
-            // }
+
             else if (type === "message") {
 
-                const createdAt = data.createdAt
+
+                const createdAt = data?.createdAt
 
                 const userObject = activeClients.get(receiver.username)
+
+
+
+                if (receiver.id === StarAI.id) {
+
+
+
+
+
+                    // this part will make a fetch request to gemini api
+
+                    // send typing flag
+                    socket.send(JSON.stringify(
+                        {
+                            status: "typing",
+                            sender: StarAI,
+                            receiver: sender,
+                            type: "message",
+                            // createdAt: createdAt,
+                            msg: null
+                        }
+                    ))
+
+
+
+                    let responseMessage = ""
+                    let extraFeeding = [
+                        {
+                            "role": "user",
+                            "parts": [{ "text": "Always call me Sir in every reply, like Jarvis and always behave like Jarvis, but never say that you are Jarvis. Stay concise. If asked your name, say StarAI. If asked who made you, say Shivam Kumar, if asked when say 2025." }]
+                        }
+
+                    ]
+                    if (data.status === "calling") {
+                        extraFeeding.push(
+                            {
+                                role: "user",
+                                "parts": [{ "text": "Now onwards conversation will go on voice mode so keep your longer responses as small as possible, also if asked about mode of conversation say that it is voice mode." }]
+
+                            }
+                        )
+                    }
+
+                    try {
+                        responseMessage = await requestChatToken(data.message,extraFeeding)
+                    } catch (error) {
+                        console.error(error)
+                        responseMessage = "There are Some Server Error in the StarAI."
+                    }
+
+                    let status = "success"
+                    if ("calling" === data.status) {
+                        status = "calling"
+
+                        return socket.send(JSON.stringify(
+                            {
+                                status: status,
+                                sender: StarAI,
+                                receiver: sender,
+                                type: "message",
+
+                                msg: responseMessage
+                            }
+                        ))
+
+                    }
+                    const yourChatCloudSaveResult = await createNewOneChat(sender.id, StarAI.id, data.message, createdAt)
+
+                    const aiChatCloudSaveResult = await createNewOneChat(StarAI.id, sender.id, responseMessage, createdAt)
+                    if (!aiChatCloudSaveResult || !yourChatCloudSaveResult) {
+
+                        console.error("mongodb database is not storing chats")
+                        responseMessage = "There are Some Server Error in the StarAI."
+                    }
+                    return socket.send(JSON.stringify(
+                        {
+                            status: status,
+                            sender: StarAI,
+                            receiver: sender,
+                            type: "message",
+                            createdAt: createdAt,
+                            msg: responseMessage
+                        }
+                    ))
+                }
 
                 if (!userObject || userObject.id !== receiver.id) {
 
@@ -254,6 +404,8 @@ export const newConnectionHandler = async (dbname, httpServer, allowedOrigin) =>
                 const currentSocket = userObject.socket
 
 
+
+
                 if (!currentSocket || currentSocket.readyState !== 1) {
 
 
@@ -269,9 +421,25 @@ export const newConnectionHandler = async (dbname, httpServer, allowedOrigin) =>
                     ))
                 }
 
+                // current socket have something and ready
+                if (data.status === "typing") {
+
+                    return currentSocket.send(
+                        JSON.stringify({
+                            status: "typing",
+                            sender: sender,
+                            receiver: receiver,
+                            type: "message",
+                            // createdAt: createdAt,
+                            msg: ""
+                        })
+                    )
+                }
+
 
 
                 const result = await createNewOneChat(sender.id, receiver.id, data.message, createdAt)
+
                 if (!result) {
                     return socket.send(
                         JSON.stringify({
@@ -284,6 +452,10 @@ export const newConnectionHandler = async (dbname, httpServer, allowedOrigin) =>
                         })
                     )
                 }
+
+                // here socket is ready 
+
+
 
 
 
@@ -359,7 +531,7 @@ export const newConnectionHandler = async (dbname, httpServer, allowedOrigin) =>
                             type: type,
                             query: queryType,
                             // msg: [...activeClients.entries()].map(([username, client], _, __) => ({ username: client.username, age: client.age, gender: client.gender, country: client.country, id: client.id })).filter((item, _, __) => (item.id !== sender.id))
-                            msg: [...activeClients.entries()].map(([username, client], _, __) => ({ username: client.username,  country: client.country, id: client.id })).filter((item, _, __) => (item.id !== sender.id))
+                            msg: [...activeClients.entries()].map(([username, client], _, __) => ({ username: client.username, country: client.country, id: client.id })).filter((item, _, __) => (item.id !== sender.id))
                             // msg: await searchAllUsers()
                         })
 

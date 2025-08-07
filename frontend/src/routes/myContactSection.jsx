@@ -95,7 +95,7 @@ export const MyRecentContactSection = (props) => {
                             </div>
                         </div>
                         <div>
-                            <section style={{ backgroundImage: `url(${props.CountryMap.get(user.country).png})` }}></section>
+                            <section style={{ backgroundImage: `url(${props.CountryMap.get(user.country)?.png})` }}></section>
 
                         </div>
 
