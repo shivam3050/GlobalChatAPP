@@ -79,7 +79,8 @@ export const MyRecentContactSection = (props) => {
                         key={index}>
                         <div style={{
                             // backgroundImage: `url(${user.gender === "male" ? "male_small.png" : "female_small.png"})`
-                            backgroundImage: `url("default_user_photo.png")`
+                            backgroundImage: (user.country==="nocountry") ? (`url(${aiProfile.profileImage})`): url("default_user_photo.png")
+                            
 
                         }}>
 
@@ -89,7 +90,7 @@ export const MyRecentContactSection = (props) => {
                                 {user.username}
                             </div>
                             <div>
-                                <section>{`Age ${user.age} yrs`}</section> <section>{user.country}</section>
+                                <section></section> <section>{(user.country==="nocountry")?"":user.country}</section>
 
 
                             </div>
