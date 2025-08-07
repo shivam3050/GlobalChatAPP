@@ -50,7 +50,7 @@ export const startChromeOfflineVoiceRecognition = async (transcriptExportLocatio
     recog.onend = () => {
         clearTimeout(silenceTimer);
         console.log("Recognition ended.");
-        timeToSend = true
+       
         recog.start()
         
     };
