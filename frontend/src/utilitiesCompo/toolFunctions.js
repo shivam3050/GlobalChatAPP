@@ -3,7 +3,6 @@
 
 export const startChromeOfflineVoiceRecognition = async (transcriptExportLocation) => {
 
-    // this function will never stop by itsself so external stopping will be required
     transcriptExportLocation.transcriptinput=""
     if (!window.webkitSpeechRecognition) {
         throw new Error("webkitSpeechRecognition not supported");
@@ -51,7 +50,7 @@ export const startChromeOfflineVoiceRecognition = async (transcriptExportLocatio
         clearTimeout(silenceTimer);
         console.log("Recognition ended.");
        
-        recog.start()
+        resolve()
         
     };
 
