@@ -4,7 +4,7 @@ import AllUsers from './routes/AllUsers';
 import ChatsRoute from './routes/ChatsRoute';
 import { Home } from './routes/home'
 import { useEffect, useRef, useState } from "react"
-import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
+import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import { userRef as userSchema, chatsRef as chatSchema } from '../src/controllers/userModel.js';
 import { countries } from './controllers/allCountries.js';
 

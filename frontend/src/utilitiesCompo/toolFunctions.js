@@ -22,7 +22,7 @@ export const startChromeOfflineVoiceRecognition = async (transcriptExportLocatio
             console.log("Stop bcz of silence.");
             
             
-        }, 3000);
+        }, 4000);
     };
 
 
@@ -36,7 +36,6 @@ export const startChromeOfflineVoiceRecognition = async (transcriptExportLocatio
             currentRecognisedSpeech =  event.results[index][0].transcript;
             transcriptExportLocation.current.yourGlobalStarAiReference.transcriptinput += currentRecognisedSpeech
 
-            console.log("You said:", transcriptExportLocation.current.yourGlobalStarAiReference.transcriptinput);
             resetSilenceTimer();
 
         };

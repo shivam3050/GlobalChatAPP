@@ -46,7 +46,7 @@ const requestChatToken = async (currentUserPrompt, fewHistory = null) => {
 
     }
     const data = await res.json()
-    
+
     return data["candidates"][0]["content"]["parts"][0]["text"]
 
 
@@ -235,7 +235,7 @@ export const newConnectionHandler = async (dbname, httpServer, allowedOrigin) =>
         //     socket.close(1008, "age is less then 18")
         //     return
         // }
-        const reservedUsernames = ["StarAI", "StarAI", "StarAI", "stars_ai", "stars.ai"]
+        const reservedUsernames = ["StarAI", "StarAi", "starai", "star_ai", "star.ai"]
 
         if (reservedUsernames.some(name => name === username)) {
             socket.close(1008, "this is a reserved username")
@@ -331,6 +331,10 @@ export const newConnectionHandler = async (dbname, httpServer, allowedOrigin) =>
                         {
                             "role": "user",
                             "parts": [{ "text": "Always call me Sir in every reply, like Jarvis and always behave like Jarvis, but never say that you are Jarvis. Stay concise. If asked your name, say StarAI. If asked who made you, say Shivam Kumar, if asked when say 2025." }]
+                        },
+                        {
+                            "role": "model",
+                            "parts": [{ "text": "Got it, Sir." }]
                         }
 
                     ]
@@ -338,14 +342,20 @@ export const newConnectionHandler = async (dbname, httpServer, allowedOrigin) =>
                         extraFeeding.push(
                             {
                                 role: "user",
-                                "parts": [{ "text": "Now onwards conversation will go on voice mode so keep your longer responses as small as possible, also if asked about mode of conversation say that it is voice mode." }]
+                                "parts": [{ "text": "Now onwards conversation will go on voice mode so keep your longer responses as small as possible, also if user sometime asks about mode of conversation then tell that it is voice conversation" }]
 
+                            }
+                        )
+                        extraFeeding.push(
+                            {
+                                "role": "model",
+                                "parts": [{ "text": "Got it, Sir." }]
                             }
                         )
                     }
 
                     try {
-                        responseMessage = await requestChatToken(data.message,extraFeeding)
+                        responseMessage = await requestChatToken(data.message, extraFeeding)
                     } catch (error) {
                         console.error(error)
                         responseMessage = "There are Some Server Error in the StarAI."
