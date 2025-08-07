@@ -873,7 +873,7 @@ export function Home(props) {
                         <div className="profile-photo-in-header" style={{
                             display: selectedReceiver.username ? "flex" : "none",
                             // backgroundImage: `url(${selectedReceiver.gender === "male" ? "male_small.png" : "female_small.png"})`
-                            backgroundImage: `url("default_user_photo.png")`
+                            backgroundImage: 'url("default_user_photo.png")'
                         }}>
 
                         </div>

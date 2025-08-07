@@ -71,7 +71,7 @@ export const UserSection = (props) => {
                         }
                         key={index}>
                         <div style={{
-                            backgroundImage: (user.country==="nocountry") ? (`url(${aiProfile.profileImage})`): url("default_user_photo.png")
+                            backgroundImage: (user.country==="nocountry") ? (`url(${aiProfile.profileImage})`): 'url("default_user_photo.png")'
 
                         }}>
 

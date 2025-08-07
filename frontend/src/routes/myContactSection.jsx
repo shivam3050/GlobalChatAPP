@@ -79,7 +79,7 @@ export const MyRecentContactSection = (props) => {
                         key={index}>
                         <div style={{
                             // backgroundImage: `url(${user.gender === "male" ? "male_small.png" : "female_small.png"})`
-                            backgroundImage: (user.country==="nocountry") ? (`url(${aiProfile.profileImage})`): url("default_user_photo.png")
+                            backgroundImage: (user.country==="nocountry") ? (`url(${aiProfile.profileImage})`): 'url("default_user_photo.png")'
                             
 
                         }}>
