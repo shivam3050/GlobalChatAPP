@@ -3,7 +3,7 @@
 
 export const startChromeOfflineVoiceRecognition = async (transcriptExportLocation) => {
 
-    transcriptExportLocation.transcriptinput=""
+    transcriptExportLocation.current.yourGlobalStarAiReference.transcriptinput = ""
     if (!window.webkitSpeechRecognition) {
         throw new Error("webkitSpeechRecognition not supported");
     }
@@ -18,49 +18,59 @@ export const startChromeOfflineVoiceRecognition = async (transcriptExportLocatio
     const resetSilenceTimer = () => {
         clearTimeout(silenceTimer);
         silenceTimer = setTimeout(() => {
-            recog.stop(); 
+            recog.stop();
             console.log("Stop bcz of silence.");
-        }, 5000);
+            
+            
+        }, 3000);
     };
 
-    
-    return new Promise((resolve,reject)=>{
+
+    return new Promise((resolve, reject) => {
+
+        let currentRecognisedSpeech = ""
+
         recog.onresult = (event) => {
-        const index = event.resultIndex;
-        console.log("just cheching something: ",event.results)
-        transcriptExportLocation.transcriptinput += event.results[index][0].transcript;
+            const index = event.resultIndex;
+            currentRecognisedSpeech = ""
+            currentRecognisedSpeech =  event.results[index][0].transcript;
+            transcriptExportLocation.current.yourGlobalStarAiReference.transcriptinput += currentRecognisedSpeech
 
-        console.log("You said:", transcriptExportLocation.transcriptinput);
-        resetSilenceTimer();
+            console.log("You said:", transcriptExportLocation.current.yourGlobalStarAiReference.transcriptinput);
+            resetSilenceTimer();
 
-    };
+        };
 
-    recog.onerror = (e) => {
-        transcriptExportLocation.transcriptinput = "";
-        console.error("Error:", e.error);
-        reject(e)
-    };
+        recog.onerror = (e) => {
+            transcriptExportLocation.current.yourGlobalStarAiReference.transcriptinput = "";
+            console.error("Error:", e.error);
+            reject(e)
+        };
 
-    recog.onstart = () => {
-        console.log("Recognition started.");
-        resetSilenceTimer();
-    };
+        recog.onstart = () => {
+            console.log("Recognition started.");
+            resetSilenceTimer();
+        };
 
-    recog.onend = () => {
-        clearTimeout(silenceTimer);
-        console.log("Recognition ended.");
-       
-        resolve()
-        
-    };
+        recog.onend = () => {
+            clearTimeout(silenceTimer);
+            console.log("Recognition ended.");
 
-    recog.start();
+            if(currentRecognisedSpeech){
+                resolve()
+            }else{
+                reject()
+            }
+
+        };
+
+        recog.start();
     })
 }
 
 
 
-export function speakWithChromeOfflineSynthesizer(textToSpeak) {
+export async function speakWithChromeOfflineSynthesizer(textToSpeak) {
     if (!window.speechSynthesis || !window.SpeechSynthesisUtterance) {
         throw new Error("Speech synthesis not supported");
     }
@@ -71,10 +81,19 @@ export function speakWithChromeOfflineSynthesizer(textToSpeak) {
     utterance.pitch = 1;    // Normal pitch
     utterance.volume = 1;   // Max volume
 
-    utterance.onerror = (e) => {
-        console.error("Speech synthesis error:", e.error);
-    };
 
-    window.speechSynthesis.speak(utterance);
+    return new Promise((resolve, reject) => {
+        utterance.onend = () => {
+            resolve()
+        }
+        utterance.onerror = (e) => {
+            console.error("Speech synthesis error:", e.error);
+            reject(e)
+        };
+
+
+        window.speechSynthesis.speak(utterance);
+    })
+
 }
 

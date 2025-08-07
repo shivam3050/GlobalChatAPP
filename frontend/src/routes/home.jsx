@@ -145,7 +145,7 @@ export function Home(props) {
 
 
                 // here is the structure
-           
+
 
 
                 userRef.current = {
@@ -386,7 +386,11 @@ export function Home(props) {
                     if (data.status === "calling" && props.userRef.current.yourGlobalStarAiReference.isAiCallingOn.flag) {
                         //play instantly
 
-                        speakWithChromeOfflineSynthesizer(data.msg)
+                        await speakWithChromeOfflineSynthesizer(data.msg)
+                        // speaking call again listening function
+
+                        await startChromeOfflineVoiceRecognition(props.userRef)
+
                         return // just play the part and do nothing for status = calling response
                     }
                     // THIS IS THE PART WHERE RECEIVER IS FOCUSED AND MSG CAME FROM HIM
@@ -552,7 +556,45 @@ export function Home(props) {
                     if (data.status === "calling" && props.userRef.current.yourGlobalStarAiReference.isAiCallingOn.flag) {
                         //play instantly
 
-                        speakWithChromeOfflineSynthesizer(data.msg)
+                        try {
+                            await speakWithChromeOfflineSynthesizer(data.msg)
+
+                            // speaking call again listening function
+
+                            let text = await startChromeOfflineVoiceRecognition(props.userRef)
+
+                            if(text===""){
+                                return console.error("no text to send")
+                            }
+
+                            
+                        } catch (error) {
+                            return console.error(error)
+                        }
+
+
+                        //sending to again ai
+                        if (!props.socketContainer.current || props.socketContainer.current.readyState !== 1) {
+                            console.error("socket is not ready")
+                            props.userRef.current.yourGlobalStarAiReference.isAiCallingOn.flag = false;
+                            buttonEl.style.backgroundColor = "transparent"
+                            return
+                        }
+
+
+
+                        props.socketContainer.current.send(JSON.stringify({
+                            type: "message",
+                            status: "calling",
+                            message: props.userRef.current.yourGlobalStarAiReference.transcriptinput,
+
+                            receiver: props.userRef.current.yourGlobalStarAiReference,
+                            // sender: { username: props.userRef.current.username, id: props.userRef.current.id, age: props.userRef.current.age, gender: props.userRef.current.gender, country: props.userRef.current.country }
+                            sender: { username: props.userRef.current.username, id: props.userRef.current.id, country: props.userRef.current.country }
+
+
+                        }))
+
 
                         return // just play the part and do nothing for status = calling response
                     }
@@ -562,7 +604,7 @@ export function Home(props) {
                     // THIS IS THE CONDITION WHERE RECEIVER IS NOT FOCUSED BUT MESSAGE CAME FROM HIM
 
 
-                    if (data.status === "failed" || data.status === "calling" || data.status==="typing") {
+                    if (data.status === "failed" || data.status === "calling" || data.status === "typing") {
                         console.error("this is failed message by any random or known user who is unfocused")
                         return
                     }
@@ -673,13 +715,15 @@ export function Home(props) {
 
 
 
-        setToggleSelect(false)
+
 
 
         if (e.currentTarget.getAttribute("value") === "close") {
+            setToggleSelect(false)
             return
         }
         if (e.currentTarget.getAttribute("value") === "refresh") {
+            setToggleSelect(false)
 
 
             if (!props.socketContainer.current || props.socketContainer.current.readyState !== 1) {
@@ -705,7 +749,7 @@ export function Home(props) {
             return
         }
         if (e.currentTarget.getAttribute("value") === "logout") {
-
+            setToggleSelect(false)
 
 
             if (!props.socketContainer || props.socketContainer.current.readyState !== 1) {
@@ -746,40 +790,56 @@ export function Home(props) {
             return
         }
         if (e.currentTarget.getAttribute("value") === "callai") {
+
             const buttonEl = e.currentTarget;
 
-           
 
-            if (props.userRef.current.yourGlobalStarAiReference.isAiCallingOn.flag) {
+            //cleared/stoped any initaily speaking text
+            if (window.speechSynthesis.speaking) {
+                window.speechSynthesis.cancel()
+                return
+            }
+
+
+
+
+
+            if (props.userRef.current.yourGlobalStarAiReference.isAiCallingOn.flag) { // checking whether ai already listening and if the stoping it
                 props.userRef.current.yourGlobalStarAiReference.isAiCallingOn.instance?.stop()
-                props.userRef.current.yourGlobalStarAiReference.isAiCallingOn.flag = false
-                buttonEl.style.backgroundColor = "green"
+                props.userRef.current.yourGlobalStarAiReference.isAiCallingOn.flag = false;
+                buttonEl.style.backgroundColor = "transparent"
                 return
             }
 
             try {
-                // await window.navigator.mediaDevices.getUserMedia({ audio: true });
-                props.userRef.current.yourGlobalStarAiReference.isAiCallingOn.instance = await startChromeOfflineVoiceRecognition(props.userRef.current.yourGlobalStarAiReference)
+
+                props.userRef.current.yourGlobalStarAiReference.isAiCallingOn.flag = true;
+                buttonEl.style.backgroundColor = "red"
+                props.userRef.current.yourGlobalStarAiReference.isAiCallingOn.instance = await startChromeOfflineVoiceRecognition(props.userRef)
+                // props.userRef.current.yourGlobalStarAiReference.isAiCallingOn.flag = false;
+                // buttonEl.style.backgroundColor = "transparent"
 
             } catch (error) {
-                console.error("transripter is not working right now",error)
+                console.error("transripter is not working right now", error)
+                props.userRef.current.yourGlobalStarAiReference.isAiCallingOn.flag = false;
+                buttonEl.style.backgroundColor = "transparent"
                 return
             }
 
             if (!props.socketContainer.current || props.socketContainer.current.readyState !== 1) {
                 console.error("socket is not ready")
+                props.userRef.current.yourGlobalStarAiReference.isAiCallingOn.flag = false;
+                buttonEl.style.backgroundColor = "transparent"
                 return
             }
 
-            props.userRef.current.yourGlobalStarAiReference.isAiCallingOn.flag = true;
-            buttonEl.style.backgroundColor = "red"
 
 
             props.socketContainer.current.send(JSON.stringify({
                 type: "message",
                 status: "calling",
                 message: props.userRef.current.yourGlobalStarAiReference.transcriptinput,
-                
+
                 receiver: props.userRef.current.yourGlobalStarAiReference,
                 // sender: { username: props.userRef.current.username, id: props.userRef.current.id, age: props.userRef.current.age, gender: props.userRef.current.gender, country: props.userRef.current.country }
                 sender: { username: props.userRef.current.username, id: props.userRef.current.id, country: props.userRef.current.country }
