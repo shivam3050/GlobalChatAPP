@@ -1,5 +1,5 @@
 
-import { countries } from "../controllers/allCountries.js";
+import { aiProfile, countries } from "../controllers/allCountries.js";
 import { useState } from "react";
 
 import Loading from "../utilitiesCompo/loading";
@@ -413,7 +413,7 @@ export function Home(props) {
 
                             typingFlagRef.current.setTimeoutId = setTimeout(() => {
 
-                                if (typingFlagRef.current.element) {
+                                if (typingFlagRef.current.element && chatsDiv.contains(typingFlagRef.current.element)) {
                                     chatsDiv.removeChild(typingFlagRef.current.element)
                                 }
 
@@ -479,18 +479,18 @@ export function Home(props) {
 
 
 
-                    // this actual msg came success
+                    //NOW this actual msg came success
                     // removing typing flag
 
                     if (data.sender.username === "StarAI") {
                         const chatsDiv = props.chatsDivRef.current
 
-                        if (typingFlagRef.current.element) {
+                        if (typingFlagRef.current.element && chatsDiv.contains(typingFlagRef.current.element)) {
 
+                            clearTimeout(typingFlagRef.current.setTimeoutId)
                             chatsDiv.removeChild(typingFlagRef.current.element)
                             typingFlagRef.current.element = null
                             typingFlagRef.current.setTimeoutId
-                            clearTimeout(typingFlagRef.current.setTimeoutId)
 
 
                         }
@@ -518,27 +518,161 @@ export function Home(props) {
 
 
 
-                    // const chatsDiv = props.chatsDivRef.current
+                    
 
+                    // const chatField = document.createElement("div")
+
+                    // chatField.style.alignSelf = "flex-start"
+
+                    // const chatTextField = document.createElement("pre")
+
+                    // const chatStatusField = document.createElement("div")
+
+                    // chatTextField.textContent = data.msg // this is ai's coming reponse data.msg
+
+                    // chatStatusField.textContent = createdAt
+
+                    // chatField.appendChild(chatTextField)
+
+                    // chatField.appendChild(chatStatusField)
+
+                    // chatsDiv.appendChild(chatField)
+
+                    // chatsDiv?.scrollTo({ top: chatsDiv?.scrollHeight, behavior: 'smooth' })
+
+                    // NEW CONCEPT
+                    
                     const chatField = document.createElement("div")
-
                     chatField.style.alignSelf = "flex-start"
-
+                    chatField.style.maxWidth = "90%"
                     const chatTextField = document.createElement("pre")
 
-                    const chatStatusField = document.createElement("div")
+                    chatTextField.style.display = "flex"
+                    chatTextField.style.flexDirection = "column"
+                    chatTextField.style.rowGap = "0"
 
-                    chatTextField.textContent = data.msg
 
-                    chatStatusField.textContent = createdAt
+
+                    let startCode = false
+
+                    
+                    let i = 0
+                    for (let line of data.msg.split("\n")) {
+                        
+                        
+                        
+                        if(line.length===0) continue; //ignore
+
+                        if(startCode === false && line.startsWith("```") ){// code start now
+                            const strong = document.createElement("legend")
+
+
+                            
+
+                            const onClick = (count)=>{
+                                
+                                
+                                let text = ""
+                                for(let code of chatTextField.querySelectorAll(`.codeLine${count}`)){
+                                    text += code.textContent + "\n"
+                                    
+                                }
+                                window.navigator.clipboard.writeText(text)
+                           
+                                
+                                
+                            }
+                            
+
+                            strong.textContent = "Copy" // line.slice(3)
+                            
+                            strong.classList.add("codeLine")
+                            strong.classList.add("copylegend")
+                            
+                            strong.style.marginTop = "var(--max-padding)"
+                            strong.style.paddingBottom = "var(--max-padding)"
+                            strong.style.borderTopLeftRadius = "10px"
+                            strong.style.borderTopRightRadius = "10px"
+                            strong.style.color = "white"
+                            strong.display = "inline"
+                            const count = i
+                            strong.onclick = () => onClick(count)
+                            chatTextField.appendChild(strong)
+                            
+                            
+                            startCode=true
+                            continue
+                        }
+
+                        if(startCode && line.startsWith("```") && line.length===3){// code end here
+        
+                            startCode=false
+                            i++
+                            continue
+                        }
+                        if(startCode) { // code still , this will go in code part
+                            const codeLine = document.createElement("div")
+                            codeLine.classList.add("codeLine")
+                            codeLine.classList.add(`codeLine${i}`)
+                            let indexOfComment = line.indexOf("//")
+                            let comment = ""
+                            if(indexOfComment!==-1){
+                                comment = line.slice(indexOfComment)
+                                line = line.slice(0,indexOfComment)
+                            }
+                            codeLine.textContent = line
+                            chatTextField.appendChild(codeLine)
+                            
+                            continue
+                        }
+
+                        if(line.length===1 && startCode===false){ // one char only
+                            
+                            const strong = document.createElement("strong")
+                            strong.textContent = line
+                            chatTextField.appendChild(strong)
+                            continue
+                        }
+
+                        if(!startCode && line.slice(0,3)===line.slice(-2) && line.indexOf("**")!==-1){
+                            const strong = document.createElement("strong")
+                            strong.textContent = line
+                            chatTextField.appendChild(strong)
+                            continue
+                        }
+                        
+                        if(!startCode){
+                            
+                            const div = document.createElement("div")
+                            div.textContent = line
+                            chatTextField.appendChild(div)
+                            continue
+                        }
+
+
+
+
+
+
+                        
+                        
+                        
+                    }
 
                     chatField.appendChild(chatTextField)
 
+                    const chatStatusField = document.createElement("div")
+                    chatStatusField.textContent = createdAt
+                    chatStatusField.style.marginTop = "var(--max-margin)"
                     chatField.appendChild(chatStatusField)
+
 
                     chatsDiv.appendChild(chatField)
 
                     chatsDiv?.scrollTo({ top: chatsDiv?.scrollHeight, behavior: 'smooth' })
+
+                    //NEW CONCEPT END
+
 
 
 
@@ -933,7 +1067,9 @@ export function Home(props) {
                         <div className="profile-photo-in-header" style={{
                             display: selectedReceiver.username ? "flex" : "none",
                             // backgroundImage: `url(${selectedReceiver.gender === "male" ? "male_small.png" : "female_small.png"})`
-                            backgroundImage: 'url("default_user_photo.png")'
+                            // backgroundImage: 'url("default_user_photo.png")'
+                            backgroundImage: (selectedReceiver.country==="nocountry") ? (`url(${aiProfile.profileImage})`): 'url("default_user_photo.png")'
+
                         }}>
 
                         </div>

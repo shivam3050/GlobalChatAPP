@@ -362,6 +362,7 @@ export const newConnectionHandler = async (dbname, httpServer, allowedOrigin) =>
                     }
 
                     let status = "success"
+
                     if ("calling" === data.status) {
                         status = "calling"
 
@@ -377,6 +378,9 @@ export const newConnectionHandler = async (dbname, httpServer, allowedOrigin) =>
                         ))
 
                     }
+
+                    
+
                     const yourChatCloudSaveResult = await createNewOneChat(sender.id, StarAI.id, data.message, createdAt)
 
                     const aiChatCloudSaveResult = await createNewOneChat(StarAI.id, sender.id, responseMessage, createdAt)

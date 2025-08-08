@@ -225,6 +225,26 @@ legend {
     -webkit-tap-highlight-color: transparent;
 }
 
+.copylegend {
+    
+    font-weight: bolder;
+    border-top: 1px solid black;
+    font-size: 16px;
+    user-select: none;
+}
+.copylegend:active {
+    transition: transform 0.4s ease;
+}
+.copylegend:hover  {
+    background-color: rgba(30, 30, 30, 0.5);
+    transition: background-color 0.4s ease;
+    transform: scale(1);
+}
+.copylegend:active  {
+    background-color: var(--darkest-black-user);
+    transform: scale(0.9);
+}
+
 
 input[type="text"],
 input[type="number"],
@@ -828,10 +848,23 @@ input[type="password"]:focus {
     font-size: var(--med-font-size);
 }
 
+.codeLine {
+    background-color: var(--darkest-black-user);
+    color: rgb(116, 169, 255);
+    font-family: monospace;
+    font-size: 80%;
+    word-spacing: normal;
+    display: flex;
+    justify-content: start;
+    word-break: normal;
+    overflow-wrap: anywhere;
+    padding-inline: var(--max-padding);
+}
+
 .user-vs-chat-container> :nth-child(1)>*> :nth-child(2),
 .chatTextStatus {
     /* this is pointing to chats sub details */
-    font-size: var(--mini-font-size);
+    font-size: var(--min-font-size);
     display: flex;
     justify-content: end;
     font-family: '"Segoe UI", "Helvetica Neue", Helvetica, "Lucida Grande", Arial, Ubuntu, Cantarell, "Fira Sans", sans-serif';
@@ -1222,13 +1255,13 @@ input[type="password"]:focus {
     transition: background-color 0.4s ease;
     transform: scale(1);
 }
-.web-rtc-page button:active  {
-    
-    transform: scale(0.98);
-}
 .web-rtc-page legend:active  {
     background-color: var(--darkest-black-user);
     transform: scale(0.9);
+}
+.web-rtc-page button:active  {
+    
+    transform: scale(0.98);
 }
 
 .any-label {
