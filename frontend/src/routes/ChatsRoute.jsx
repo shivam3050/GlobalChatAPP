@@ -159,7 +159,7 @@ function ChatsRoute(props) {
                         // }}
 
 
-                        style={{ resize: "none" }} placeholder={`Send to ${selectedReceiver}...`} name="message" maxLength="500">
+                        style={{ resize: "none" }} placeholder={`Send to ${selectedReceiver}...`} name="message" maxLength="50000">
 
                     </textarea>
                 </div>
