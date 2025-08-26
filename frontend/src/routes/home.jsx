@@ -90,6 +90,7 @@ export function Home(props) {
         try {
             // socketContainer.current = new WebSocket(`${import.meta.env.VITE_BACKEND_WS_URL}/?username=${username}&age=${age}&gender=${gender}&country=${encodeURIComponent(country)}`)
             socketContainer.current = new WebSocket(`${import.meta.env.VITE_BACKEND_WS_URL}/?username=${username}&country=${encodeURIComponent(country)}`)
+            socketContainer.current.binaryType = "arraybuffer";
         } catch (error) {
 
             setSignInLoadingFlag(false)
@@ -116,199 +117,245 @@ export function Home(props) {
         }
 
         socketContainer.current.onmessage = async (message) => {
-            setSignInLoadingFlag(false)
-            setSignInErrorLog("")
-            let data = null
-            try {
-                data = JSON.parse(message.data)
-            } catch (error) {
-                console.error(error)
-                return
-            }
 
-            if (data.type === "register") {
+            if (typeof message.data === "string") {
 
-
-                // set here full screen mode 
-                // const elem = document.documentElement;
-                // if (elem.requestFullscreen) {
-                //     elem.requestFullscreen();
-                // } else if (elem.webkitRequestFullscreen) { // Safari
-                //     elem.webkitRequestFullscreen();
-                // } else if (elem.msRequestFullscreen) { // IE11
-                //     elem.msRequestFullscreen();
-                // }
-
-                //
-
-
-
-
-                // here is the structure
-
-
-
-                userRef.current = {
-
-                    username: data.username,
-
-                    // age: data.age,
-
-                    // gender: data.gender,
-
-                    country: data.country,
-
-                    id: data.id,
-
-                    yourGlobalStarAiReference: (data.availableUsers[0]["username"] === "StarAI") ?
-                        {
-                            ...data.availableUsers[0],
-                            transcriptinput: "",
-                            isAiCallingOn: { instance: null, flag: false },
-                            textoutput: "",
-                            unread: false
-
-                        } : {
-                            username: "",
-                            id: "",
-                            // age: null,
-                            // gender: "",
-                            country: "",
-                            transcriptinput: "",
-                            isAiCallingOn: { instance: null, flag: false },
-                            textoutput: "",
-                            unread: false
-                        },
-
-                    availableConnectedUsersUnreadLength: 0,
-
-                    availableUsers: data.availableUsers || [],
-
-                    availableConnectedUsers: []
-                }
-
-
-
-
-
-                setUser(data.username)
-                return
-            }
-
-            if (data.type === "query-message") {
-
-                if (data.query === "refresh-all-user") {
-
-
-                    userRef.current.availableUsers = data.msg || []
-
-
-
-                    if (userRef.current.availableUsers) {
-
-                        props.setRefreshGlobalUsersFlag(prev => prev + 1)
-
-                        navigate("/users")
-
-                        setHeaderTitle("Globet")
-
-                    }
-
+                setSignInLoadingFlag(false)
+                setSignInErrorLog("")
+                let data = null
+                try {
+                    data = JSON.parse(message.data)
+                } catch (error) {
+                    console.error(error)
                     return
                 }
-                if (data.query === "chat-list-demand") {
+
+                if (data.type === "register") {
 
 
-                    if (data.sender.id !== userRef.current.id) {
-                        //this is not for me  which i have queried when click on a user
-                        console.error("query respose is not for me")
-                        return
+                    // set here full screen mode 
+                    // const elem = document.documentElement;
+                    // if (elem.requestFullscreen) {
+                    //     elem.requestFullscreen();
+                    // } else if (elem.webkitRequestFullscreen) { // Safari
+                    //     elem.webkitRequestFullscreen();
+                    // } else if (elem.msRequestFullscreen) { // IE11
+                    //     elem.msRequestFullscreen();
+                    // }
+
+                    //
+
+
+
+
+                    // here is the structure
+
+
+
+                    userRef.current = {
+
+                        username: data.username,
+
+                        // age: data.age,
+
+                        // gender: data.gender,
+
+                        country: data.country,
+
+                        id: data.id,
+
+                        yourGlobalStarAiReference: (data.availableUsers[0]["username"] === "StarAI") ?
+                            {
+                                ...data.availableUsers[0],
+                                transcriptinput: "",
+                                isAiCallingOn: { instance: null, flag: false },
+                                textoutput: "",
+                                unread: false
+
+                            } : {
+                                username: "",
+                                id: "",
+                                // age: null,
+                                // gender: "",
+                                country: "",
+                                transcriptinput: "",
+                                isAiCallingOn: { instance: null, flag: false },
+                                textoutput: "",
+                                unread: false
+                            },
+
+                        availableConnectedUsersUnreadLength: 0,
+
+                        availableUsers: data.availableUsers || [],
+
+                        availableConnectedUsers: []
                     }
 
 
 
 
 
+                    setUser(data.username)
+                    return
+                }
+
+                if (data.type === "query-message") {
+
+                    if (data.query === "refresh-all-user") {
+
+
+                        userRef.current.availableUsers = data.msg || []
+
+
+
+                        if (userRef.current.availableUsers) {
+
+                            props.setRefreshGlobalUsersFlag(prev => prev + 1)
+
+                            navigate("/users")
+
+                            setHeaderTitle("Globet")
+
+                        }
+
+                        return
+                    }
+                    if (data.query === "chat-list-demand") {
+
+
+                        if (data.sender.id !== userRef.current.id) {
+                            //this is not for me  which i have queried when click on a user
+                            console.error("query respose is not for me")
+                            return
+                        }
 
 
 
 
 
-                    if (data.status === "failed") {
 
-                        props.setChatsOverlay(true)
 
-                        userRef.current.focusedContact = {}
+
+
+
+                        if (data.status === "failed") {
+
+                            props.setChatsOverlay(true)
+
+                            userRef.current.focusedContact = {}
+
+                            chatRef.current.sender = data.sender;
+
+                            chatRef.current.receiver = data.receiver;
+
+                            chatRef.current.availableChats = []
+
+                            navigate("/chats")
+
+                            setHeaderTitle("")
+
+                            return
+                        }
+
+
+                        //below is for success
+
+                        // here is the structure
+
+                        props.setChatsOverlay(false)
+
+
+                        userRef.current.focusedContact = data.receiver
+
+                        setSelectedReceiver(userRef.current.focusedContact)
+
+                        chatRef.current.availableChats = []
 
                         chatRef.current.sender = data.sender;
 
                         chatRef.current.receiver = data.receiver;
 
-                        chatRef.current.availableChats = []
+
+
+
+                        if (data.msg.length) {
+
+                            chatRef.current.availableChats = data.msg
+
+                        }
+
+
+
+
+                        setSelectedReceiver(userRef.current.focusedContact)
+
+
+                        props.setRefreshChatsFlag(prev => prev + 1)
 
                         navigate("/chats")
 
-                        setHeaderTitle("")
+                        // userRef.current.availableUsers.unread = false
 
                         return
                     }
-
-
-                    //below is for success
-
-                    // here is the structure
-
-                    props.setChatsOverlay(false)
-
-
-                    userRef.current.focusedContact = data.receiver
-
-                    setSelectedReceiver(userRef.current.focusedContact)
-
-                    chatRef.current.availableChats = []
-
-                    chatRef.current.sender = data.sender;
-
-                    chatRef.current.receiver = data.receiver;
-
-
-
-
-                    if (data.msg.length) {
-
-                        chatRef.current.availableChats = data.msg
-
-                    }
-
-
-
-
-                    setSelectedReceiver(userRef.current.focusedContact)
-
-
-                    props.setRefreshChatsFlag(prev => prev + 1)
-
-                    navigate("/chats")
-
-                    // userRef.current.availableUsers.unread = false
-
+                    console.error("invalid query but valid type in the respnse")
                     return
                 }
-                console.error("invalid query but valid type in the respnse")
-                return
-            }
 
-            if (data.type === "message") {
+                if (data.type === "message") {
 
 
 
 
-                if (data.sender.id === userRef.current.id) {
-                    // this means i send s message and its response came to me
+                    if (data.sender.id === userRef.current.id) {
+                        // this means i send s message and its response came to me
 
-                    if (data.status === "failed") {
+                        if (data.status === "failed") {
 
-                        console.error("your msg has been failed", data.msg)
+                            console.error("your msg has been failed", data.msg)
+
+                            const chatsDiv = props.chatsDivRef.current
+
+
+                            const pendinGlobetFields = chatsDiv.querySelectorAll(".newly-unupdated-chats")
+
+                            for (let i = 0; i < pendinGlobetFields.length; i++) {
+
+                                pendinGlobetFields[i].children[1].textContent = `❌`
+
+                                pendinGlobetFields[i].classList.remove("newly-unupdated-chats")
+                            }
+
+                            return
+                        }
+
+
+
+
+
+                        // this is actual message successed for back to me
+                        // checks if receiver already in my contacts or not
+                        if (!(userRef.current.availableConnectedUsers.some((obj) => (obj.id === data.receiver.id)))) {
+
+                            // this is means not present
+
+
+                            userRef.current.availableConnectedUsers.push(
+                                {
+
+                                    username: data.receiver.username,
+                                    // age: data.receiver.age,
+                                    // gender: data.receiver.gender,
+                                    country: data.receiver.country,
+                                    id: data.receiver.id,
+                                    unread: false
+
+                                }
+                            )
+
+                        }
+
+
 
                         const chatsDiv = props.chatsDivRef.current
 
@@ -317,49 +364,391 @@ export function Home(props) {
 
                         for (let i = 0; i < pendinGlobetFields.length; i++) {
 
-                            pendinGlobetFields[i].children[1].textContent = `❌`
+                            const date = new Date(data.createdAt)
+
+                            const createdAt = date.toLocaleTimeString("en-IN", {
+                                hour: "2-digit",
+                                minute: "2-digit",
+                                hour12: true,
+                            });
+
+
+                            pendinGlobetFields[i].children[1].textContent = `✔ ${createdAt}`
 
                             pendinGlobetFields[i].classList.remove("newly-unupdated-chats")
+
                         }
+
+
 
                         return
                     }
 
+                    if (data.sender.id === userRef.current.focusedContact?.id) {
+
+                        // ai is the sender , must listen 
+                        //calling
+                        if (data.status === "calling" && props.userRef.current.yourGlobalStarAiReference.isAiCallingOn.flag) {
+                            //play instantly
+
+                            await speakWithChromeOfflineSynthesizer(data.msg)
+                            // speaking call again listening function
+
+                            await startChromeOfflineVoiceRecognition(props.userRef)
+
+                            return // just play the part and do nothing for status = calling response
+                        }
+                        // THIS IS THE PART WHERE RECEIVER IS FOCUSED AND MSG CAME FROM HIM
+                        //failed
+                        if (data.status === "failed") {
+                            console.error("recieved failed msg by a sender to me")
+                            return
+                        }
+
+                        //typing
+                        if (data.status === "typing" && data.sender.username === "StarAI") {
 
 
+                            const chatsDiv = props.chatsDivRef.current
+
+                            if (typingFlagRef.current.element) {
+
+                                clearTimeout(typingFlagRef.current.setTimeoutId)
 
 
-                    // this is actual message successed for back to me
-                    // checks if receiver already in my contacts or not
-                    if (!(userRef.current.availableConnectedUsers.some((obj) => (obj.id === data.receiver.id)))) {
+                                typingFlagRef.current.setTimeoutId = setTimeout(() => {
 
-                        // this is means not present
+                                    if (typingFlagRef.current.element && chatsDiv.contains(typingFlagRef.current.element)) {
+                                        chatsDiv.removeChild(typingFlagRef.current.element)
+                                    }
 
+                                }, 10000)
 
-                        userRef.current.availableConnectedUsers.push(
-                            {
-
-                                username: data.receiver.username,
-                                // age: data.receiver.age,
-                                // gender: data.receiver.gender,
-                                country: data.receiver.country,
-                                id: data.receiver.id,
-                                unread: false
+                                return
 
                             }
-                        )
 
-                    }
-
+                            const chatField = document.createElement("div")
 
 
-                    const chatsDiv = props.chatsDivRef.current
+
+                            typingFlagRef.current.element = chatField
+
+                            const chatTextField = document.createElement("pre")
+
+                            chatTextField.classList.add("bouncing-last-three-dots-animation")
+
+                            chatTextField.style.display = "flex"
 
 
-                    const pendinGlobetFields = chatsDiv.querySelectorAll(".newly-unupdated-chats")
 
-                    for (let i = 0; i < pendinGlobetFields.length; i++) {
+                            for (let i = 0; i < 3; i++) {
+                                const dot = document.createElement("div");
+                                dot.textContent = "·";
+                                chatTextField.appendChild(dot);
+                            }
 
+
+
+                            const chatStatusField = document.createElement("div")
+
+
+
+                            chatField.appendChild(chatTextField)
+
+                            chatField.appendChild(chatStatusField)
+
+
+                            chatsDiv.appendChild(chatField)
+
+                            chatsDiv?.scrollTo({ top: chatsDiv?.scrollHeight, behavior: 'smooth' })
+
+                            typingFlagRef.current.setTimeoutId = setTimeout(() => {
+
+                                if (typingFlagRef.current.element) {
+                                    chatsDiv.removeChild(typingFlagRef.current.element)
+                                }
+
+                            }, 10000)
+
+                            return
+                        }
+                        //typing
+                        if (data.status === "typing" && data.sender.username !== "StarAI") {
+
+                            // later on i will update this
+                            return
+
+                        }
+
+
+
+
+                        //NOW this actual msg came success
+                        // from here no typing only actual msg parts starts
+
+
+
+                        // actaul msg from starAi
+                        if (data.sender.username === "StarAI") {
+                            // removing typing flag if any came then.
+                            const chatsDiv = props.chatsDivRef.current
+
+                            if (typingFlagRef.current.element && chatsDiv.contains(typingFlagRef.current.element)) {
+
+                                clearTimeout(typingFlagRef.current.setTimeoutId)
+                                chatsDiv.removeChild(typingFlagRef.current.element)
+                                typingFlagRef.current.element = null
+                                typingFlagRef.current.setTimeoutId
+
+
+                            }
+
+
+
+
+
+
+
+
+
+
+
+                            const date = new Date(data.createdAt)
+
+                            const createdAt = date.toLocaleTimeString("en-IN", {
+                                hour: "2-digit",
+                                minute: "2-digit",
+                                hour12: true,
+                            });
+
+
+
+
+                            // NEW CONCEPT
+
+                            const chatField = document.createElement("div")
+                            chatField.style.alignSelf = "flex-start"
+                            chatField.style.maxWidth = "90%"
+                            const chatTextField = document.createElement("pre")
+
+                            chatTextField.style.display = "flex"
+                            chatTextField.style.flexDirection = "column"
+                            chatTextField.style.rowGap = "0"
+
+
+
+                            let startCode = false
+
+
+                            let i = 0
+                            for (let line of data.msg.split("\n")) {
+
+
+
+                                if (line.length === 0) continue; //ignore
+
+                                if (line.startsWith("‹‹Context››")) {
+
+                                    const userPart = line.split('userRequest:')[1].split('modelResponse:')[0].trim();
+                                    const modelPart = line.split('modelResponse:')[1].trim();
+
+
+                                    props.chatRef.current?.starAiRecentChatContextStack.push(
+                                        {
+                                            "role": "user",
+                                            "parts": [{ "text": userPart }]
+                                        }
+                                    )
+                                    props.chatRef.current?.starAiRecentChatContextStack.push(
+                                        {
+                                            "role": "model",
+                                            "parts": [{ "text": modelPart }]
+                                        }
+                                    )
+                                    continue;
+                                }
+
+
+
+                                if (startCode === false && line.startsWith("```")) {// code start now
+                                    const strong = document.createElement("legend")
+
+
+
+
+                                    const onClick = (count) => {
+
+
+                                        let text = ""
+                                        for (let code of chatTextField.querySelectorAll(`.codeLine${count}`)) {
+                                            text += code.textContent + "\n"
+
+                                        }
+                                        window.navigator.clipboard.writeText(text)
+
+
+
+                                    }
+
+
+                                    strong.textContent = "Copy" // line.slice(3)
+
+                                    strong.classList.add("codeLine")
+                                    strong.classList.add("copylegend")
+
+                                    strong.style.marginTop = "var(--max-padding)"
+                                    strong.style.paddingBottom = "var(--max-padding)"
+                                    strong.style.borderTopLeftRadius = "10px"
+                                    strong.style.borderTopRightRadius = "10px"
+                                    strong.style.color = "white"
+                                    strong.display = "inline"
+                                    const count = i
+                                    strong.onclick = () => onClick(count)
+                                    chatTextField.appendChild(strong)
+
+
+                                    startCode = true
+                                    continue
+                                }
+
+                                if (startCode && line.startsWith("```") && line.length === 3) {// code end here
+
+                                    startCode = false
+                                    i++
+                                    continue
+                                }
+                                if (startCode) { // code still , this will go in code part
+                                    const codeLine = document.createElement("div")
+                                    codeLine.classList.add("codeLine")
+                                    codeLine.classList.add(`codeLine${i}`)
+                                    let indexOfComment = line.indexOf("//")
+                                    let comment = ""
+                                    if (indexOfComment !== -1) {
+                                        comment = line.slice(indexOfComment)
+                                        line = line.slice(0, indexOfComment)
+                                    }
+                                    codeLine.textContent = line
+                                    chatTextField.appendChild(codeLine)
+
+                                    continue
+                                }
+
+                                if (line.length === 1 && startCode === false) { // one char only
+
+                                    const strong = document.createElement("strong")
+                                    strong.textContent = line
+                                    chatTextField.appendChild(strong)
+                                    continue
+                                }
+
+                                if (!startCode && line.slice(0, 3) === line.slice(-2) && line.indexOf("**") !== -1) {
+                                    const strong = document.createElement("strong")
+                                    strong.textContent = line
+                                    chatTextField.appendChild(strong)
+                                    continue
+                                }
+
+                                if (!startCode) {
+
+                                    const div = document.createElement("div")
+                                    div.textContent = line
+                                    chatTextField.appendChild(div)
+                                    continue
+                                }
+
+
+
+
+
+
+
+
+
+                            }
+
+                            chatField.appendChild(chatTextField)
+
+                            const chatStatusField = document.createElement("div")
+                            chatStatusField.textContent = createdAt
+                            chatStatusField.style.marginTop = "var(--max-margin)"
+                            chatField.appendChild(chatStatusField)
+
+
+                            chatsDiv.appendChild(chatField)
+
+                            chatsDiv?.scrollTo({ top: chatsDiv?.scrollHeight, behavior: 'smooth' })
+
+                            //NEW CONCEPT END
+
+
+
+
+
+
+
+                            return
+                        }
+
+
+                        //actual msg from focused otther than ai
+
+
+                        //status == attachment
+
+                        if (data.status === "download-button") {
+                            const chatsDiv = props.chatsDivRef.current
+                            const date = new Date(data.createdAt)
+
+                            const createdAt = date.toLocaleTimeString("en-IN", {
+                                hour: "2-digit",
+                                minute: "2-digit",
+                                hour12: true,
+                            });
+
+                            const chatField = document.createElement("div")
+                            chatField.style.alignSelf = "flex-start"
+                            chatField.style.maxWidth = "80%"
+                            const chatTextFieldButton = document.createElement("button")
+                            chatTextFieldButton.type = "button"
+
+                            chatTextFieldButton.style.display = "flex"
+                            chatTextFieldButton.style.flexDirection = "column"
+                            chatTextFieldButton.style.rowGap = "0"
+                            const fileId = data.msg.fileId
+                            const filename = data.msg.filename
+                            const filesize = data.msg.filesize
+                            chatTextFieldButton.textContent = `${filename} ${filesize}`
+
+                            chatTextFieldButton.onclick = () => {
+                                props.socketContainer.current.send(JSON.stringify(
+                                    {
+                                        status: "success",
+                                        sender: data.sender,
+                                        receiver: data.receiver,
+                                        type: "query-message",
+                                        queryType: "get-small-file",
+                                        createdAt: createdAt,
+                                        msg: data.msg
+                                    }
+                                ))
+                            }
+
+
+                            chatField.appendChild(chatTextFieldButton)
+
+                            const chatStatusField = document.createElement("div")
+                            chatStatusField.textContent = createdAt
+                            chatStatusField.style.marginTop = "var(--max-margin)"
+                            chatField.appendChild(chatStatusField)
+
+
+                            chatsDiv.appendChild(chatField)
+
+                            chatsDiv?.scrollTo({ top: chatsDiv?.scrollHeight, behavior: 'smooth' })
+                            return
+                        }
+                        const chatsDiv = props.chatsDivRef.current
                         const date = new Date(data.createdAt)
 
                         const createdAt = date.toLocaleTimeString("en-IN", {
@@ -368,89 +757,23 @@ export function Home(props) {
                             hour12: true,
                         });
 
-
-                        pendinGlobetFields[i].children[1].textContent = `✔ ${createdAt}`
-
-                        pendinGlobetFields[i].classList.remove("newly-unupdated-chats")
-
-                    }
-
-
-
-                    return
-                }
-
-                if (data.sender.id === userRef.current.focusedContact?.id) {
-
-                    // ai is the sender , must listen 
-                    if (data.status === "calling" && props.userRef.current.yourGlobalStarAiReference.isAiCallingOn.flag) {
-                        //play instantly
-
-                        await speakWithChromeOfflineSynthesizer(data.msg)
-                        // speaking call again listening function
-
-                        await startChromeOfflineVoiceRecognition(props.userRef)
-
-                        return // just play the part and do nothing for status = calling response
-                    }
-                    // THIS IS THE PART WHERE RECEIVER IS FOCUSED AND MSG CAME FROM HIM
-
-                    if (data.status === "failed") {
-                        console.error("recieved failed msg by a sender to me")
-                        return
-                    }
-
-
-                    if (data.status === "typing" && data.sender.username === "StarAI") {
-
-
-                        const chatsDiv = props.chatsDivRef.current
-
-                        if (typingFlagRef.current.element) {
-
-                            clearTimeout(typingFlagRef.current.setTimeoutId)
-
-
-                            typingFlagRef.current.setTimeoutId = setTimeout(() => {
-
-                                if (typingFlagRef.current.element && chatsDiv.contains(typingFlagRef.current.element)) {
-                                    chatsDiv.removeChild(typingFlagRef.current.element)
-                                }
-
-                            }, 10000)
-
-                            return
-
-                        }
-
+                        //this is normal text msg
                         const chatField = document.createElement("div")
-
-
-
-                        typingFlagRef.current.element = chatField
-
+                        chatField.style.alignSelf = "flex-start"
+                        chatField.style.maxWidth = "80%"
                         const chatTextField = document.createElement("pre")
 
-                        chatTextField.classList.add("bouncing-last-three-dots-animation")
-
                         chatTextField.style.display = "flex"
-
-
-
-                        for (let i = 0; i < 3; i++) {
-                            const dot = document.createElement("div");
-                            dot.textContent = "·";
-                            chatTextField.appendChild(dot);
-                        }
-
-
-
-                        const chatStatusField = document.createElement("div")
-
+                        chatTextField.style.flexDirection = "column"
+                        chatTextField.style.rowGap = "0"
+                        chatTextField.textContent = data.msg
 
 
                         chatField.appendChild(chatTextField)
 
+                        const chatStatusField = document.createElement("div")
+                        chatStatusField.textContent = createdAt
+                        chatStatusField.style.marginTop = "var(--max-margin)"
                         chatField.appendChild(chatStatusField)
 
 
@@ -458,377 +781,189 @@ export function Home(props) {
 
                         chatsDiv?.scrollTo({ top: chatsDiv?.scrollHeight, behavior: 'smooth' })
 
-                        typingFlagRef.current.setTimeoutId = setTimeout(() => {
 
-                            if (typingFlagRef.current.element) {
-                                chatsDiv.removeChild(typingFlagRef.current.element)
-                            }
 
-                        }, 10000)
 
-                        return
-                    }
 
-                    if (data.status === "typing" && data.sender.username !== "StarAI") {
-
-                        // later on i will update this
-                        return
 
                     }
 
 
+                    if (data.receiver && data.sender.id !== userRef.current.focusedContact?.id) {
 
 
-                    //NOW this actual msg came success
-                    // removing typing flag
+                        // ai is the sender , must listen 
+                        if (data.status === "calling" && props.userRef.current.yourGlobalStarAiReference.isAiCallingOn.flag) {
+                            //play instantly
 
-                    if (data.sender.username === "StarAI") {
-                        const chatsDiv = props.chatsDivRef.current
+                            try {
+                                await speakWithChromeOfflineSynthesizer(data.msg)
 
-                        if (typingFlagRef.current.element && chatsDiv.contains(typingFlagRef.current.element)) {
+                                // speaking call again listening function
 
-                            clearTimeout(typingFlagRef.current.setTimeoutId)
-                            chatsDiv.removeChild(typingFlagRef.current.element)
-                            typingFlagRef.current.element = null
-                            typingFlagRef.current.setTimeoutId
+                                let text = await startChromeOfflineVoiceRecognition(props.userRef)
 
-
-                        }
-
-                    }
-
-                    const chatsDiv = props.chatsDivRef.current
-
-
-
-
-
-
-
-
-
-                    const date = new Date(data.createdAt)
-
-                    const createdAt = date.toLocaleTimeString("en-IN", {
-                        hour: "2-digit",
-                        minute: "2-digit",
-                        hour12: true,
-                    });
-
-
-
-
-                    
-
-                    // const chatField = document.createElement("div")
-
-                    // chatField.style.alignSelf = "flex-start"
-
-                    // const chatTextField = document.createElement("pre")
-
-                    // const chatStatusField = document.createElement("div")
-
-                    // chatTextField.textContent = data.msg // this is ai's coming reponse data.msg
-
-                    // chatStatusField.textContent = createdAt
-
-                    // chatField.appendChild(chatTextField)
-
-                    // chatField.appendChild(chatStatusField)
-
-                    // chatsDiv.appendChild(chatField)
-
-                    // chatsDiv?.scrollTo({ top: chatsDiv?.scrollHeight, behavior: 'smooth' })
-
-                    // NEW CONCEPT
-                    
-                    const chatField = document.createElement("div")
-                    chatField.style.alignSelf = "flex-start"
-                    chatField.style.maxWidth = "90%"
-                    const chatTextField = document.createElement("pre")
-
-                    chatTextField.style.display = "flex"
-                    chatTextField.style.flexDirection = "column"
-                    chatTextField.style.rowGap = "0"
-
-
-
-                    let startCode = false
-
-                    
-                    let i = 0
-                    for (let line of data.msg.split("\n")) {
-                        
-                        
-                        
-                        if(line.length===0) continue; //ignore
-
-                        if(startCode === false && line.startsWith("```") ){// code start now
-                            const strong = document.createElement("legend")
-
-
-                            
-
-                            const onClick = (count)=>{
-                                
-                                
-                                let text = ""
-                                for(let code of chatTextField.querySelectorAll(`.codeLine${count}`)){
-                                    text += code.textContent + "\n"
-                                    
+                                if (text === "") {
+                                    return console.error("no text to send")
                                 }
-                                window.navigator.clipboard.writeText(text)
-                           
-                                
-                                
-                            }
-                            
-
-                            strong.textContent = "Copy" // line.slice(3)
-                            
-                            strong.classList.add("codeLine")
-                            strong.classList.add("copylegend")
-                            
-                            strong.style.marginTop = "var(--max-padding)"
-                            strong.style.paddingBottom = "var(--max-padding)"
-                            strong.style.borderTopLeftRadius = "10px"
-                            strong.style.borderTopRightRadius = "10px"
-                            strong.style.color = "white"
-                            strong.display = "inline"
-                            const count = i
-                            strong.onclick = () => onClick(count)
-                            chatTextField.appendChild(strong)
-                            
-                            
-                            startCode=true
-                            continue
-                        }
-
-                        if(startCode && line.startsWith("```") && line.length===3){// code end here
-        
-                            startCode=false
-                            i++
-                            continue
-                        }
-                        if(startCode) { // code still , this will go in code part
-                            const codeLine = document.createElement("div")
-                            codeLine.classList.add("codeLine")
-                            codeLine.classList.add(`codeLine${i}`)
-                            let indexOfComment = line.indexOf("//")
-                            let comment = ""
-                            if(indexOfComment!==-1){
-                                comment = line.slice(indexOfComment)
-                                line = line.slice(0,indexOfComment)
-                            }
-                            codeLine.textContent = line
-                            chatTextField.appendChild(codeLine)
-                            
-                            continue
-                        }
-
-                        if(line.length===1 && startCode===false){ // one char only
-                            
-                            const strong = document.createElement("strong")
-                            strong.textContent = line
-                            chatTextField.appendChild(strong)
-                            continue
-                        }
-
-                        if(!startCode && line.slice(0,3)===line.slice(-2) && line.indexOf("**")!==-1){
-                            const strong = document.createElement("strong")
-                            strong.textContent = line
-                            chatTextField.appendChild(strong)
-                            continue
-                        }
-                        
-                        if(!startCode){
-                            
-                            const div = document.createElement("div")
-                            div.textContent = line
-                            chatTextField.appendChild(div)
-                            continue
-                        }
 
 
-
-
-
-
-                        
-                        
-                        
-                    }
-
-                    chatField.appendChild(chatTextField)
-
-                    const chatStatusField = document.createElement("div")
-                    chatStatusField.textContent = createdAt
-                    chatStatusField.style.marginTop = "var(--max-margin)"
-                    chatField.appendChild(chatStatusField)
-
-
-                    chatsDiv.appendChild(chatField)
-
-                    chatsDiv?.scrollTo({ top: chatsDiv?.scrollHeight, behavior: 'smooth' })
-
-                    //NEW CONCEPT END
-
-
-
-
-
-
-
-                    return
-                }
-
-
-                if (data.receiver && data.sender.id !== userRef.current.focusedContact?.id) {
-
-
-                    // ai is the sender , must listen 
-                    if (data.status === "calling" && props.userRef.current.yourGlobalStarAiReference.isAiCallingOn.flag) {
-                        //play instantly
-
-                        try {
-                            await speakWithChromeOfflineSynthesizer(data.msg)
-
-                            // speaking call again listening function
-
-                            let text = await startChromeOfflineVoiceRecognition(props.userRef)
-
-                            if(text===""){
-                                return console.error("no text to send")
+                            } catch (error) {
+                                return console.error(error)
                             }
 
-                            
-                        } catch (error) {
-                            return console.error(error)
+
+                            //sending to again ai
+                            if (!props.socketContainer.current || props.socketContainer.current.readyState !== 1) {
+                                console.error("socket is not ready")
+                                props.userRef.current.yourGlobalStarAiReference.isAiCallingOn.flag = false;
+                                buttonEl.style.backgroundColor = "transparent"
+                                return
+                            }
+
+
+
+                            props.socketContainer.current.send(JSON.stringify({
+                                type: "message",
+                                status: "calling",
+                                message: props.userRef.current.yourGlobalStarAiReference.transcriptinput,
+
+                                receiver: props.userRef.current.yourGlobalStarAiReference,
+                                // sender: { username: props.userRef.current.username, id: props.userRef.current.id, age: props.userRef.current.age, gender: props.userRef.current.gender, country: props.userRef.current.country }
+                                sender: { username: props.userRef.current.username, id: props.userRef.current.id, country: props.userRef.current.country }
+
+
+                            }))
+
+
+                            return // just play the part and do nothing for status = calling response
                         }
 
 
-                        //sending to again ai
-                        if (!props.socketContainer.current || props.socketContainer.current.readyState !== 1) {
-                            console.error("socket is not ready")
-                            props.userRef.current.yourGlobalStarAiReference.isAiCallingOn.flag = false;
-                            buttonEl.style.backgroundColor = "transparent"
+
+                        // THIS IS THE CONDITION WHERE RECEIVER IS NOT FOCUSED BUT MESSAGE CAME FROM HIM
+
+
+                        if (data.status === "failed" || data.status === "calling" || data.status === "typing") {
+                            console.error("this is failed message by any random or known user who is unfocused")
                             return
                         }
 
 
 
-                        props.socketContainer.current.send(JSON.stringify({
-                            type: "message",
-                            status: "calling",
-                            message: props.userRef.current.yourGlobalStarAiReference.transcriptinput,
+                        // checks if receiver already in my contacts or not
 
-                            receiver: props.userRef.current.yourGlobalStarAiReference,
-                            // sender: { username: props.userRef.current.username, id: props.userRef.current.id, age: props.userRef.current.age, gender: props.userRef.current.gender, country: props.userRef.current.country }
-                            sender: { username: props.userRef.current.username, id: props.userRef.current.id, country: props.userRef.current.country }
+                        let searchFound = false
 
+                        for (let i = 0; i < userRef.current.availableConnectedUsers.length; i++) {
 
-                        }))
+                            if (userRef.current.availableConnectedUsers[i].id === data.sender.id) {
+                                // this condition shows random sender is in your recent contacts already
+                                userRef.current.availableConnectedUsers[i].unread = true
+                                searchFound = true
+                                props.setRefreshUsersFlag((prev) => (prev + 1))
 
+                                userRef.current.availableConnectedUsersUnreadLength += 1
 
-                        return // just play the part and do nothing for status = calling response
-                    }
+                                props.setRecentUnreadContactCount(userRef.current.availableConnectedUsersUnreadLength)
 
+                                break
+                            }
 
+                        }
 
-                    // THIS IS THE CONDITION WHERE RECEIVER IS NOT FOCUSED BUT MESSAGE CAME FROM HIM
+                        if (!searchFound) {
 
-
-                    if (data.status === "failed" || data.status === "calling" || data.status === "typing") {
-                        console.error("this is failed message by any random or known user who is unfocused")
-                        return
-                    }
-
+                            // this is means this user is not present in available contacts
 
 
-                    // checks if receiver already in my contacts or not
 
-                    let searchFound = false
+                            userRef.current.availableConnectedUsers.push(
 
-                    for (let i = 0; i < userRef.current.availableConnectedUsers.length; i++) {
+                                {
 
-                        if (userRef.current.availableConnectedUsers[i].id === data.sender.id) {
-                            // this condition shows random sender is in your recent contacts already
-                            userRef.current.availableConnectedUsers[i].unread = true
-                            searchFound = true
-                            props.setRefreshUsersFlag((prev) => (prev + 1))
+                                    username: data.sender.username,
+                                    // age: data.sender.age,
+                                    // gender: data.sender.gender,
+                                    country: data.sender.country,
+                                    id: data.sender.id,
+                                    unread: true
+
+                                }
+                            )
 
                             userRef.current.availableConnectedUsersUnreadLength += 1
 
                             props.setRecentUnreadContactCount(userRef.current.availableConnectedUsersUnreadLength)
 
-                            break
+
+                            props.setRefreshUsersFlag((prev) => (prev + 1))
+
+
+
+
                         }
 
-                    }
-
-                    if (!searchFound) {
-
-                        // this is means this user is not present in available contacts
-
-
-
-                        userRef.current.availableConnectedUsers.push(
-
-                            {
-
-                                username: data.sender.username,
-                                // age: data.sender.age,
-                                // gender: data.sender.gender,
-                                country: data.sender.country,
-                                id: data.sender.id,
-                                unread: true
-
-                            }
-                        )
-
-                        userRef.current.availableConnectedUsersUnreadLength += 1
-
-                        props.setRecentUnreadContactCount(userRef.current.availableConnectedUsersUnreadLength)
-
-
-                        props.setRefreshUsersFlag((prev) => (prev + 1))
 
 
 
 
+
+
+
+
+
+
+
+
+
+                        // if (!inboxIconRef.current.classList.contains("svg-container-inbox-icon")) {
+
+
+                        //     inboxIconRef.current.classList.add("svg-container-inbox-icon")
+
+
+                        // }
+                        return
                     }
 
 
 
 
-
-
-
-
-
-
-
-
-
-
-                    // if (!inboxIconRef.current.classList.contains("svg-container-inbox-icon")) {
-
-
-                    //     inboxIconRef.current.classList.add("svg-container-inbox-icon")
-
-
-                    // }
                     return
                 }
 
 
 
-
+                console.error("invalid data type in response")
                 return
             }
+            else if (message.data instanceof ArrayBuffer) {
+                // recieving a file smaller than 5 mb
+                const uint8 = new Uint8Array(message.data);
+                const metaLength = (uint8[0] << 8) | uint8[1];
 
-            console.error("invalid data type in response")
-            return
+                // Metadata
+                const metaUint8 = uint8.slice(2, 2 + metaLength);
+                const metaStr = new TextDecoder().decode(metaUint8);
+                const metadata = JSON.parse(metaStr);
+
+                const fileUint8 = uint8.slice(2 + metaLength);
+
+                console.log('Metadata:', metadata);
+                console.log('File Uint8Array length:', fileUint8.length);
+
+                // Optional: create Blob and download
+                const blob = new Blob([fileUint8]);
+                const link = document.createElement('a');
+                link.href = URL.createObjectURL(blob);
+                link.download = metadata.msg.filename;
+                link.click();
+
+                return
+            } else {
+                return console.error("recived some unknown type of message neighter string nor blob")
+            }
 
         }
     }
@@ -1068,7 +1203,7 @@ export function Home(props) {
                             display: selectedReceiver.username ? "flex" : "none",
                             // backgroundImage: `url(${selectedReceiver.gender === "male" ? "male_small.png" : "female_small.png"})`
                             // backgroundImage: 'url("default_user_photo.png")'
-                            backgroundImage: (selectedReceiver.country==="nocountry") ? (`url(${aiProfile.profileImage})`): 'url("default_user_photo.png")'
+                            backgroundImage: (selectedReceiver.country === "nocountry") ? (`url(${aiProfile.profileImage})`) : 'url("default_user_photo.png")'
 
                         }}>
 

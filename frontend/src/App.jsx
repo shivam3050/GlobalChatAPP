@@ -24,6 +24,7 @@ function App() {
 
   const [user, setUser] = useState(null)
 
+
   const userRef = useRef(userSchema)
 
   const chatRef = useRef(chatSchema)

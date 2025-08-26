@@ -15,6 +15,7 @@ export const userRef = {
         unread: false
     },
     availableConnectedUsersUnreadLength: 0,
+
     availableConnectedUsers: [
         {
             username: "",
@@ -73,5 +74,11 @@ export const chatsRef = {
             content: "",
             createdAt: ""
         }
+    ],
+    starAiRecentChatContextStack: [
+        // {
+        //     "role": "user",
+        //     "parts": [{ "text": "" }]
+        // }
     ]
 }

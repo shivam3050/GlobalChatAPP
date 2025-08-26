@@ -3,10 +3,11 @@ import { ChatSection } from './chat';
 
 
 function ChatsRoute(props) {
+    const attachmentFileRef = useRef(null)
 
 
     const [selectedReceiver, setSelectedReceiver] = useState("")
-    
+
 
     useEffect(() => {
         if (props.userRef.current.focusedContact.username) {
@@ -52,7 +53,7 @@ function ChatsRoute(props) {
                 onSubmit={(e) => {
 
                     e.preventDefault();
-                    const formData = new FormData(e.target);
+                    const formData = new FormData(e.currentTarget);
                     const message = formData.get("message")
 
                     if (!props.socketContainer.current || props.socketContainer.current.readyState !== 1) {
@@ -71,6 +72,97 @@ function ChatsRoute(props) {
                         minute: "2-digit",
                         hour12: true,
                     });
+                    const file = attachmentFileRef.current.files[0]
+
+                    if (file) {
+                        const chatsDiv = props.chatsDivRef.current
+
+                        const chatField = document.createElement("div")
+
+                        if (props.userRef.current.id !== props.userRef.current.focusedContact.id) {
+                            chatField.style.alignSelf = "flex-end"
+                        }
+                        else {
+                            chatField.style.alignSelf = "flex-start"
+                        }
+
+                        chatField.classList.add("newly-unupdated-chats")
+
+                        const chatTextField = document.createElement("pre")
+
+                        const chatStatusField = document.createElement("div")
+
+                        chatTextField.textContent = `Name: ${file.name} `
+
+                        chatStatusField.textContent = `${localTimeOnly}`
+
+                        chatField.appendChild(chatTextField)
+
+                        chatField.appendChild(chatStatusField)
+
+                        chatField.classList.add("background-gradient-in-chat")
+
+                        chatsDiv.appendChild(chatField)
+
+                        chatsDiv?.scrollTo({ top: chatsDiv?.scrollHeight, behavior: 'smooth' })
+
+                        //apply creation of buffer of data
+                        const str = JSON.stringify(
+                            {
+                                type: "attachment",
+
+                                message: { filesize: file.size, filename: file.name },
+                                createdAt: timestamp,
+                                receiver: props.userRef.current.focusedContact,
+                                // sender: { username: props.userRef.current.username, id: props.userRef.current.id, age: props.userRef.current.age, gender: props.userRef.current.gender, country: props.userRef.current.country }
+                                sender: { username: props.userRef.current.username, id: props.userRef.current.id, country: props.userRef.current.country }
+                            }
+                        )
+
+
+                        const reader = new FileReader()
+
+                        reader.onload = (e) => {
+                            const fileArrayBuffer = e.target.result;
+                            const fileUint8 = new Uint8Array(fileArrayBuffer);
+
+                            const encoder = new TextEncoder();
+                            const metaDataUint8 = encoder.encode(str);
+                            const metaDataLength = metaDataUint8.length;
+
+                            if (metaDataLength > 65535) {
+                                
+                                console.error("Metadata is too large for this attachment");
+                                return;
+                            }
+
+                            const binaryContainer = new Uint8Array(2 + metaDataLength + fileUint8.length);
+
+                            
+                            binaryContainer[0] = (metaDataLength >> 8) & 0xff;
+                            binaryContainer[1] = metaDataLength & 0xff;
+
+                            
+                            binaryContainer.set(metaDataUint8, 2);
+
+                            
+                            binaryContainer.set(fileUint8, 2 + metaDataLength);
+
+                            
+                            props.socketContainer.current.send(binaryContainer.buffer);
+
+                        }
+
+                        reader.readAsArrayBuffer(file)
+
+
+
+
+
+
+
+                        return
+                    }
 
                     const chatsDiv = props.chatsDivRef.current
 
@@ -108,8 +200,9 @@ function ChatsRoute(props) {
                         JSON.stringify(
                             {
                                 type: "message",
-                                
+
                                 message: message,
+                                starAiRecentChatContextStack: (props.chatRef.current?.starAiRecentChatContextStack),
                                 createdAt: timestamp,
                                 receiver: props.userRef.current.focusedContact,
                                 // sender: { username: props.userRef.current.username, id: props.userRef.current.id, age: props.userRef.current.age, gender: props.userRef.current.gender, country: props.userRef.current.country }
@@ -124,44 +217,46 @@ function ChatsRoute(props) {
 
                 }}>
                 <div>
-                    <textarea required
+                    <textarea
 
                         spellCheck="false"
 
                         onFocus={(e) => { enableTextBoxOnBlur(e) }}
 
-                        // onInput={() => {
-
-                        //     clearTimeout(typingTimeoutRef.current);
 
 
-                        //     typingTimeoutRef.current = setTimeout(()=>{
-                                
-                        //         props.socketContainer.current.send(
-    
-                        //             JSON.stringify(
-                        //                 {
-                        //                     type: "message",
-                        //                     status:"typing",
-                        //                     // message: message,
-                        //                     // createdAt: timestamp,
-                        //                     receiver: props.userRef.current.focusedContact,
-                        //                     // sender: { username: props.userRef.current.username, id: props.userRef.current.id, age: props.userRef.current.age, gender: props.userRef.current.gender, country: props.userRef.current.country }
-                        //                     sender: { username: props.userRef.current.username, id: props.userRef.current.id, country: props.userRef.current.country }
-                        //                 }
-                        //             )
-                        //         )
-                        //     }, 400)
-                            
 
-                            
-
-                        // }}
-
-
-                        style={{ resize: "none" }} placeholder={`Send to ${selectedReceiver}...`} name="message" maxLength="500">
+                        style={{ resize: "none" }} placeholder={`Send to ${selectedReceiver}...`} name="message" maxLength="50000">
 
                     </textarea>
+                    <button className="attachment" type="button" onClick={(e) => {
+                        if (attachmentFileRef.current.files.length > 0) {
+                            attachmentFileRef.current.value = ""
+                            e.currentTarget.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-paperclip" viewBox="0 0 16 16">
+                                                        <path d="M4.5 3a2.5 2.5 0 0 1 5 0v9a1.5 1.5 0 0 1-3 0V5a.5.5 0 0 1 1 0v7a.5.5 0 0 0 1 0V3a1.5 1.5 0 1 0-3 0v9a2.5 2.5 0 0 0 5 0V5a.5.5 0 0 1 1 0v7a3.5 3.5 0 1 1-7 0z"/>
+                                                        </svg>`
+
+                            return
+                        }
+                        attachmentFileRef.current.click()
+
+
+                    }}>
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-paperclip" viewBox="0 0 16 16">
+                            <path d="M4.5 3a2.5 2.5 0 0 1 5 0v9a1.5 1.5 0 0 1-3 0V5a.5.5 0 0 1 1 0v7a.5.5 0 0 0 1 0V3a1.5 1.5 0 1 0-3 0v9a2.5 2.5 0 0 0 5 0V5a.5.5 0 0 1 1 0v7a3.5 3.5 0 1 1-7 0z" />
+                        </svg>
+                    </button>
+                    <input ref={attachmentFileRef} style={{ display: "none" }} type="file" name="" onChange={(e) => {
+                        if (e.currentTarget.files.length > 0) {
+                            e.currentTarget.parentElement.querySelector('.attachment').innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-x-circle-fill" viewBox="0 0 16 16">
+                                                        <path d="M16 8A8 8 0 1 1 0 8a8 8 0 0 1 16 0M5.354 4.646a.5.5 0 1 0-.708.708L7.293 8l-2.647 2.646a.5.5 0 0 0 .708.708L8 8.707l2.646 2.647a.5.5 0 0 0 .708-.708L8.707 8l2.647-2.646a.5.5 0 0 0-.708-.708L8 7.293z"/>
+                                                        </svg>`
+                        } else {
+                            e.currentTarget.parentElement.querySelector('.attachment').innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-paperclip" viewBox="0 0 16 16">
+                                                        <path d="M4.5 3a2.5 2.5 0 0 1 5 0v9a1.5 1.5 0 0 1-3 0V5a.5.5 0 0 1 1 0v7a.5.5 0 0 0 1 0V3a1.5 1.5 0 1 0-3 0v9a2.5 2.5 0 0 0 5 0V5a.5.5 0 0 1 1 0v7a3.5 3.5 0 1 1-7 0z"/>
+                                                        </svg>`
+                        }
+                    }} />
                 </div>
                 <div>
                     <button type="submit">
