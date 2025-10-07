@@ -80,5 +80,11 @@ export const chatsRef = {
         //     "role": "user",
         //     "parts": [{ "text": "" }]
         // }
+    ],
+    starAiRecentVoiceContextStack: [
+        // {
+        //     "role": "user",
+        //     "parts": [{ "text": "" }]
+        // }
     ]
 }

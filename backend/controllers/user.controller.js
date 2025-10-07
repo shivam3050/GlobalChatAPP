@@ -375,6 +375,13 @@ export const newConnectionHandler = async (dbname, httpServer, allowedOrigin) =>
                             }
                         }
 
+                        // here i am sending previous themes of chat contexts if given
+                        if(data.starAiRecentVoiceContextStack && data.starAiRecentVoiceContextStack.length>0){
+                            for(let j=0;j<data.starAiRecentVoiceContextStack.length;j++){
+                                extraFeeding.push(data.starAiRecentVoiceContextStack[j]);
+                            }
+                        }
+
                         if (data.status === "calling") {
 
                             // here i am sending previous themes of chat contexts if given

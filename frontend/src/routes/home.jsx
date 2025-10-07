@@ -390,8 +390,27 @@ export function Home(props) {
                         //calling
                         if (data.status === "calling" && props.userRef.current.yourGlobalStarAiReference.isAiCallingOn.flag) {
                             //play instantly
+                            // filter little bit
 
-                            await speakWithChromeOfflineSynthesizer(data.msg)
+                            let filteredText = "";
+
+                            for (let line of data.msg.split("\n")) {
+
+
+
+                                if (line.length === 0) continue; //ignore
+
+                                if (line.startsWith("‹‹Context››")) {
+
+                                    const userPart = line.split('userRequest:')[1].split('modelResponse:')[0].trim();
+                                    const modelPart = line.split('modelResponse:')[1].trim();
+
+                                } else {
+                                    filteredText += line;
+                                }
+                            }
+
+                            await speakWithChromeOfflineSynthesizer(filteredText)
                             // speaking call again listening function
 
                             await startChromeOfflineVoiceRecognition(props.userRef)
@@ -795,9 +814,45 @@ export function Home(props) {
                         // ai is the sender , must listen 
                         if (data.status === "calling" && props.userRef.current.yourGlobalStarAiReference.isAiCallingOn.flag) {
                             //play instantly
+                            // filter little bit
 
                             try {
-                                await speakWithChromeOfflineSynthesizer(data.msg)
+
+                                let filteredText = "";
+                                console.log(data.msg)
+
+                                for (let line of data.msg.split("\n")) {
+
+
+
+                                    if (line.length === 0) continue; //ignore
+
+                                    if (line.startsWith("‹‹Context››")) {
+
+                                        const userPart = line.split('userRequest:')[1].split('modelResponse:')[0].trim();
+                                        const modelPart = line.split('modelResponse:')[1].trim();
+
+                                        props.chatRef.current?.starAiRecentVoiceContextStack.push(
+                                            {
+                                                "role": "user",
+                                                "parts": [{ "text": userPart }]
+                                            }
+                                        )
+                                        props.chatRef.current?.starAiRecentVoiceContextStack.push(
+                                            {
+                                                "role": "model",
+                                                "parts": [{ "text": modelPart }]
+                                            }
+                                        )
+
+                                    } else {
+                                        filteredText += line;
+                                    }
+                                }
+                                // console.log(filteredText)
+
+
+                                await speakWithChromeOfflineSynthesizer(filteredText)
 
                                 // speaking call again listening function
 
@@ -826,6 +881,7 @@ export function Home(props) {
                             props.socketContainer.current.send(JSON.stringify({
                                 type: "message",
                                 status: "calling",
+                                starAiRecentVoiceContextStack: (props.chatRef.current?.starAiRecentVoiceContextStack),
                                 message: props.userRef.current.yourGlobalStarAiReference.transcriptinput,
 
                                 receiver: props.userRef.current.yourGlobalStarAiReference,
