@@ -1364,7 +1364,7 @@ input[type="password"]:focus {
         height: max-content;
     }
 
-    @media (max-width:300), (max-height:300){
+    @media (max-width: 300px), (max-height: 300px){
             #root{
                 width:100vw;
                 height:100vh;
@@ -1411,8 +1411,8 @@ input[type="password"]:focus {
 
 
 
-
-        --extra-height-in-android-chrome: 5vh;
+            #root{
+                --extra-height-in-android-chrome: 5vh;
 
     
 
@@ -1446,6 +1446,8 @@ input[type="password"]:focus {
     --max-font-size: 9px;
 
     --offset-for-keyboard: 50px
+            }
+        
         
 
 
