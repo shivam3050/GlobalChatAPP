@@ -1370,11 +1370,11 @@ input[type="password"]:focus {
 
 
             #root{
-                --extra-height-in-android-chrome: 5vh;
+                --extra-height-in-android-chrome: 0px;
 
     
 
-    --nav-height: 27px;
+    --nav-height: 25px;
     --toggle-select-width: 17vw;
     --border-color: #1e2832;
     --border-size: 1px;
@@ -1403,7 +1403,7 @@ input[type="password"]:focus {
     --med-font-size: 7px;
     --max-font-size: 9px;
 
-    --offset-for-keyboard: 50px
+    --offset-for-keyboard: 0px
             }
         
         
@@ -1448,6 +1448,26 @@ input[type="password"]:focus {
     padding-block: 2px;
     line-height: 8px;
         }  
+        .user-vs-chat-container>:nth-child(2)>:nth-child(1) .attachment {
+            width: 20px;
+    height: 20px;
+    padding: 0;
+    font-size: 10px;
+        }
+        .dashboard>:nth-child(1)>:nth-child(2){
+            font-size: 10px;
+        }
+        .my-contact-field-container:before {
+    content: "● " attr(data-online-users-count) " Online";
+    height: 12px;
+    width: 12px;
+    position: relative;
+    color: var(--professional-blue);
+    margin-left: 8px;
+    font-size: 8px;
+    transform: translateY(-50%);
+        }
+        
 
     }
 
