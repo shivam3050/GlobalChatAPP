@@ -1469,11 +1469,11 @@ export function Home(props) {
 
                         </section> */}
 
-                            <section className="selectbar-container" defaultValue="">
+                            <section className="selectbar-container" defaultValue="United States">
                                 <fieldset >
 
                                     <legend>Country</legend>
-                                    <select className="country-selector-signin" name="country" required>
+                                    <select className="country-selector-signin" name="country">
                                         <option style={{ visibility: "hidden" }} value="">{"▼"}</option>
 
                                         {countries.map((country, index) => (
