@@ -1364,6 +1364,50 @@ input[type="password"]:focus {
         height: max-content;
     }
 
+    @media (max-width:300), (max-height:300){
+            #root{
+                width:100vw;
+                height:100vh;
+            }
+            .signin-box input[type="text"] {
+                width: 80px;
+                font-size:10px;
+                height:10px;
+                display: block
+            }
+        .signin-box .country-selector-signin {
+            width: 25px;
+            font-size:10px;
+            height: 14px;
+        } 
+        .signin-box> :nth-child(1) {
+            font-size: 0.9rem;
+        }
+        .signin-box > :last-child {
+            border-radius: 2px;
+    font-size: 4px;
+    width: 25px;
+    height: 20px;
+    display: flex;
+    padding:0px;
+    top: -10px;
+    right: -10px;
+            display: none;
+        }
+
+        .signin-box > :nth-child(2) > :nth-last-child(2) {
+            
+        }
+
+        .signin-box > :nth-child(2) > :last-child {
+            font-size: 8px;
+    padding: 0;
+    padding-inline: 10px;
+    padding-block: 2px;
+    line-height: 8px;
+        }
+        
+
 
 
 }
