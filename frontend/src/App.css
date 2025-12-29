@@ -1406,6 +1406,46 @@ input[type="password"]:focus {
     padding-block: 2px;
     line-height: 8px;
         }
+
+
+
+
+
+
+        --extra-height-in-android-chrome: 5vh;
+
+    
+
+    --nav-height: 27px;
+    --toggle-select-width: 17vw;
+    --border-color: #1e2832;
+    --border-size: 1px;
+
+    --min-margin: 1px;
+    --med-margin: 2px;
+    --max-margin: 5px;
+
+    --min-padding: 1px;
+    --med-padding: 2px;
+    --max-padding: 5px;
+
+    --min-border-radius: 1px;
+    --med-border-radius: 1px;
+    --large-border-radius: 7px;
+
+    --mini-line-height: 7px;
+    --min-line-height: 8px;
+    --med-line-height: 9px;
+    --max-line-height: 10px;
+
+
+    --micro-font-size: 3px;
+    --mini-font-size: 4px;
+    --min-font-size: 5px;
+    --med-font-size: 7px;
+    --max-font-size: 9px;
+
+    --offset-for-keyboard: 50px
         
 
 
