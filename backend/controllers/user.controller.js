@@ -123,6 +123,36 @@ export const deleteUserAllChats = async (userId) => {
         return false
     }
 }
+export const deleteAllAssociatedFiles = async (username, dir) => {
+    try {
+
+        if (dir != "handlingFilesDir") return false
+
+        
+
+        const client = activeClients.get(username)
+        const fileKeyword = client.id
+
+        fs.readdir(dir, (err, files) => {
+            if (err) throw err;
+
+            files.forEach(file => {
+                if (file.includes(fileKeyword)) {
+                    fs.unlink(path.join(dir, file), err => {
+                        if (err && err.code !== 'ENOENT') throw err;
+                    });
+                }
+            });
+        });
+
+
+
+        return true
+    } catch (error) {
+        console.log(error)
+        return false
+    }
+}
 
 
 
@@ -870,6 +900,7 @@ export const newConnectionHandler = async (dbname, httpServer, allowedOrigin) =>
             console.log("Client disconnected");
             socket.close(1000, "logout you out")
             await deleteUserAllChats(username)
+            await deleteAllAssociatedFiles(username, handlingFilesDir)
             activeClients.delete(username)
             return
 
@@ -880,6 +911,7 @@ export const newConnectionHandler = async (dbname, httpServer, allowedOrigin) =>
 
             socket.close(1011, "logged you out due to some error")
             await deleteUserAllChats(username)
+            await deleteAllAssociatedFiles(username, handlingFilesDir)
             activeClients.delete(username)
             return
         });
