@@ -6,6 +6,9 @@ function ChatsRoute(props) {
     const attachmentFileRef = useRef(null)
 
 
+
+
+
     const [selectedReceiver, setSelectedReceiver] = useState("")
 
 
@@ -14,8 +17,11 @@ function ChatsRoute(props) {
 
             setSelectedReceiver(props.userRef.current.focusedContact.username)
 
+
         }
     }, [props.refreshChatsFlag])
+
+
 
     let scrollHandler = null;
     let lastScrollTop = 0;
@@ -106,63 +112,44 @@ function ChatsRoute(props) {
 
                         chatsDiv?.scrollTo({ top: chatsDiv?.scrollHeight, behavior: 'smooth' })
 
-                        //apply creation of buffer of data
-                        const str = JSON.stringify(
-                            {
-                                type: "attachment",
-
-                                message: { filesize: file.size, filename: file.name },
-                                createdAt: timestamp,
-                                receiver: props.userRef.current.focusedContact,
-                                // sender: { username: props.userRef.current.username, id: props.userRef.current.id, age: props.userRef.current.age, gender: props.userRef.current.gender, country: props.userRef.current.country }
-                                sender: { username: props.userRef.current.username, id: props.userRef.current.id, country: props.userRef.current.country }
-                            }
-                        )
-
-
-                        const reader = new FileReader()
-
-                        reader.onload = (e) => {
-                            const fileArrayBuffer = e.target.result;
-                            const fileUint8 = new Uint8Array(fileArrayBuffer);
-
-                            const encoder = new TextEncoder();
-                            const metaDataUint8 = encoder.encode(str);
-                            const metaDataLength = metaDataUint8.length;
-
-                            if (metaDataLength > 65535) {
-                                
-                                console.error("Metadata is too large for this attachment");
-                                return;
-                            }
-
-                            const binaryContainer = new Uint8Array(2 + metaDataLength + fileUint8.length);
-
-                            
-                            binaryContainer[0] = (metaDataLength >> 8) & 0xff;
-                            binaryContainer[1] = metaDataLength & 0xff;
-
-                            
-                            binaryContainer.set(metaDataUint8, 2);
-
-                            
-                            binaryContainer.set(fileUint8, 2 + metaDataLength);
-
-                            
-                            props.socketContainer.current.send(binaryContainer.buffer);
-
-                        }
-
-                        reader.readAsArrayBuffer(file)
 
 
 
+                        const metadata = {
 
+                            type: "file-meta-data-to-server",
+                            createdAt: timestamp,
+
+                            message: { filesize: file.size, filename: file.name },
+                            receiver: props.userRef.current.focusedContact,
+                            // sender: { username: props.userRef.current.username, id: props.userRef.current.id, age: props.userRef.current.age, gender: props.userRef.current.gender, country: props.userRef.current.country }
+                            sender: { username: props.userRef.current.username, id: props.userRef.current.id, country: props.userRef.current.country }
+                        };
+
+                        const filename = props.userRef.current.id + "_" + props.userRef.current.focusedContact.id + "_" + timestamp + "_" + file.name;
+
+                        props.chatRef.current.filesToBeSent[filename] = file;
+                        console.log("see from send ", filename)
+
+
+                        // first send metadata
+                        props.socketContainer.current.send(JSON.stringify(metadata));
+
+                        attachmentFileRef.current.value = "";
+                        const attachmentButton = e.currentTarget.querySelector(".attachment");
+
+                        // Now you can manipulate it, e.g., change innerHTML
+                        attachmentButton.innerHTML = `
+<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-paperclip" viewBox="0 0 16 16">
+    <path d="M4.5 3a2.5 2.5 0 0 1 5 0v9a1.5 1.5 0 0 1-3 0V5a.5.5 0 0 1 1 0v7a.5.5 0 0 0 1 0V3a1.5 1.5 0 1 0-3 0v9a2.5 2.5 0 0 0 5 0V5a.5.5 0 0 1 1 0v7a3.5 3.5 0 1 1-7 0z"/>
+</svg>`;
 
 
 
                         return
                     }
+
+                    if(message.trim()==="") return;
 
                     const chatsDiv = props.chatsDivRef.current
 

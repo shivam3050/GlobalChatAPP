@@ -11,7 +11,7 @@ export const userRef = {
         // age: null,
         // gender: "",
         country: "",
-        isAiCallingOn: {instance:null,flag:false},
+        isAiCallingOn: { instance: null, flag: false },
         unread: false
     },
     availableConnectedUsersUnreadLength: 0,
@@ -24,7 +24,7 @@ export const userRef = {
             // gender: "",
             country: "",
             transcriptinput: "",
-            textoutput:"",
+            textoutput: "",
             unread: false
         }
     ],
@@ -66,6 +66,9 @@ export const chatsRef = {
         // age: null,
         // gender: "",
         country: "",
+    },
+    filesToBeSent: {
+        //filename: {fileObject}          // optional unique ID per file
     },
     availableChats: [
         {

@@ -226,21 +226,24 @@ legend {
 }
 
 .copylegend {
-    
+
     font-weight: bolder;
     border-top: 1px solid black;
     font-size: 16px;
     user-select: none;
 }
+
 .copylegend:active {
     transition: transform 0.4s ease;
 }
-.copylegend:hover  {
+
+.copylegend:hover {
     background-color: rgba(30, 30, 30, 0.5);
     transition: background-color 0.4s ease;
     transform: scale(1);
 }
-.copylegend:active  {
+
+.copylegend:active {
     background-color: var(--darkest-black-user);
     transform: scale(0.9);
 }
@@ -324,7 +327,7 @@ input[type="password"]:focus {
 }
 
 @keyframes antiSpin {
-        0% {
+    0% {
         transform: rotate(360deg);
     }
 
@@ -482,7 +485,7 @@ input[type="password"]:focus {
     overflow-x: hidden;
     white-space: nowrap;
     text-overflow: ellipsis;
-   
+
     padding-inline: var(--max-padding);
 
 }
@@ -495,7 +498,7 @@ input[type="password"]:focus {
     align-items: center;
     position: relative;
     width: var(--nav-height);
-    
+
 }
 
 
@@ -724,7 +727,8 @@ input[type="password"]:focus {
     font-style: italic;
 
 }
-.users-container>*> :nth-child(3){
+
+.users-container>*> :nth-child(3) {
     /* this is country flag container */
     flex: 1;
     display: flex;
@@ -945,7 +949,8 @@ input[type="password"]:focus {
 
 }
 
-.users-container>*> :last-child, .unread-highlight-container {
+.users-container>*> :last-child,
+.unread-highlight-container {
     /* this is highlighted unread container */
 
     position: relative;
@@ -1045,6 +1050,7 @@ input[type="password"]:focus {
     animation-delay: 5s;
     left: calc(-150px + 3 * 150px);
 }
+
 .container-sign-in-overlay>:nth-child(5) {
 
     animation-delay: 1s;
@@ -1195,30 +1201,33 @@ input[type="password"]:focus {
     /* border: 1px solid white; */
 }
 
-.web-rtc-page > :nth-child(1) {
+.web-rtc-page> :nth-child(1) {
     /* this is webrtc header */
     display: flex;
     column-gap: var(--max-margin);
 }
-.web-rtc-page > :nth-child(1) * {
+
+.web-rtc-page> :nth-child(1) * {
     /* elements in webrtc header */
     display: flex;
     justify-content: center;
     align-items: center;
     text-align: center;
-    
+
 }
-.web-rtc-page > :nth-child(1) > * {
-    
+
+.web-rtc-page> :nth-child(1)>* {
+
     flex: 1;
     visibility: visible;
     font-size: 16px;
     color: white;
     background-color: var(--professional-blue);
-    
+
 
 }
-.user-vs-chat-container-like{
+
+.user-vs-chat-container-like {
     content: "";
     position: absolute;
     inset: 0;
@@ -1228,7 +1237,8 @@ input[type="password"]:focus {
     z-index: 0;
 
 }
-.user-vs-chat-container-like .user-vs-chat-container-like-with-qr-part{
+
+.user-vs-chat-container-like .user-vs-chat-container-like-with-qr-part {
     display: flex;
     flex-direction: column;
     overflow-y: scroll;
@@ -1237,7 +1247,8 @@ input[type="password"]:focus {
     background-color: transparent;
     row-gap: var(--max-margin);
 }
-.user-vs-chat-container-like-with-qr-part::after{
+
+.user-vs-chat-container-like-with-qr-part::after {
     display: block;
     content: "Steps for local offline connection:\A\. Click Create Offer from any one device once (Say Device-A)\A\. Copy Code (Device-A)\A\. Paste Code on other device and click Consume Offer (Say Device-B)\A\. Then Copy code from other device (Device-B) and paste in previous device (Device-A)\A\. Click Finalize (Device-A)";
     font-family: monospace;
@@ -1248,30 +1259,36 @@ input[type="password"]:focus {
     color: var(--extra-light-grey);
 }
 
-.web-rtc-page > :nth-child(2) .code-description{
+.web-rtc-page> :nth-child(2) .code-description {
     min-height: 100px;
 }
+
 .web-rtc-page legend {
-    
+
     font-weight: bolder;
     border-top: 1px solid black;
     font-size: 16px;
     user-select: none;
 }
-.web-rtc-page legend:active, .web-rtc-page button:active {
+
+.web-rtc-page legend:active,
+.web-rtc-page button:active {
     transition: transform 0.4s ease;
 }
-.web-rtc-page legend:hover  {
+
+.web-rtc-page legend:hover {
     background-color: rgba(30, 30, 30, 0.5);
     transition: background-color 0.4s ease;
     transform: scale(1);
 }
-.web-rtc-page legend:active  {
+
+.web-rtc-page legend:active {
     background-color: var(--darkest-black-user);
     transform: scale(0.9);
 }
-.web-rtc-page button:active  {
-    
+
+.web-rtc-page button:active {
+
     transform: scale(0.98);
 }
 
@@ -1309,37 +1326,42 @@ input[type="password"]:focus {
 }
 
 .rotateY {
-  transform: rotateY(180deg);
-  transform-style: preserve-3d;
+    transform: rotateY(180deg);
+    transform-style: preserve-3d;
 }
 
 @keyframes bouncingUpDown {
     0% {
         top: 0
     }
-    50%{
+
+    50% {
         top: 10px
     }
-    100%{
+
+    100% {
         top: 0
     }
 }
-.bouncing-last-three-dots-animation > :nth-last-child(3) {
+
+.bouncing-last-three-dots-animation> :nth-last-child(3) {
     transition: top;
     position: relative;
-    animation: bouncingUpDown 1.5s ease-out 0.4s infinite ;
-   
-}
-.bouncing-last-three-dots-animation > :nth-last-child(2) {
-    transition: top;
-    position: relative;
-    animation: bouncingUpDown 1.5s ease-out 0.2s infinite ;
+    animation: bouncingUpDown 1.5s ease-out 0.4s infinite;
 
 }
-.bouncing-last-three-dots-animation > :nth-last-child(1) {
+
+.bouncing-last-three-dots-animation> :nth-last-child(2) {
     transition: top;
     position: relative;
-    animation: bouncingUpDown 1.5s ease-out 0s infinite ;
+    animation: bouncingUpDown 1.5s ease-out 0.2s infinite;
+
+}
+
+.bouncing-last-three-dots-animation> :nth-last-child(1) {
+    transition: top;
+    position: relative;
+    animation: bouncingUpDown 1.5s ease-out 0s infinite;
 }
 
 
@@ -1365,111 +1387,115 @@ input[type="password"]:focus {
     }
 }
 
-    @media (max-width: 300px), (max-height: 300px){
-            
+@media (max-width: 300px),
+(max-height: 300px) {
 
 
-            #root{
-                --extra-height-in-android-chrome: 0px;
 
-    
-
-    --nav-height: 25px;
-    --toggle-select-width: 35vw;
-    --border-color: #1e2832;
-    --border-size: 1px;
-
-    --min-margin: 1px;
-    --med-margin: 2px;
-    --max-margin: 5px;
-
-    --min-padding: 1px;
-    --med-padding: 2px;
-    --max-padding: 5px;
-
-    --min-border-radius: 1px;
-    --med-border-radius: 1px;
-    --large-border-radius: 7px;
-
-    --mini-line-height: 7px;
-    --min-line-height: 8px;
-    --med-line-height: 9px;
-    --max-line-height: 10px;
+    #root {
+        --extra-height-in-android-chrome: 0px;
 
 
-    --micro-font-size: 3px;
-    --mini-font-size: 4px;
-    --min-font-size: 5px;
-    --med-font-size: 7px;
-    --max-font-size: 9px;
 
-    --offset-for-keyboard: 0px
-            }
-        
-        
-#root{
-                width:100vw;
-                height:100vh;
-            }
-            .signin-box input[type="text"] {
-                width: 80px;
-                font-size:10px;
-                height:10px;
-                display: block
-            }
-        .signin-box .country-selector-signin {
-            width: 25px;
-            font-size:10px;
-            height: 14px;
-        } 
-        .signin-box> :nth-child(1) {
-            font-size: 0.9rem;
-        }
-        .signin-box > :last-child {
-            border-radius: 2px;
-    font-size: 4px;
-    width: 25px;
-    height: 20px;
-    display: flex;
-    padding:0px;
-    top: -10px;
-    right: -10px;
-            display: none;
-        }
+        --nav-height: 25px;
+        --toggle-select-width: 35vw;
+        --border-color: #1e2832;
+        --border-size: 1px;
 
-        .signin-box > :nth-child(2) > :nth-last-child(2) {
-            
-        }
+        --min-margin: 1px;
+        --med-margin: 2px;
+        --max-margin: 5px;
 
-        .signin-box > :nth-child(2) > :last-child {
-            font-size: 8px;
-    padding: 0;
-    padding-inline: 10px;
-    padding-block: 2px;
-    line-height: 8px;
-        }  
-        .user-vs-chat-container>:nth-child(2)>:nth-child(1) .attachment {
-            width: 20px;
-    height: 20px;
-    padding: 0;
-    font-size: 10px;
-        }
-        .dashboard>:nth-child(1)>:nth-child(2){
-            font-size: 10px;
-        }
-        .my-contact-field-container:before {
-    content: "● " attr(data-online-users-count) " Online";
-    height: 12px;
-    width: 12px;
-    position: relative;
-    color: var(--professional-blue);
-    margin-left: 8px;
-    font-size: 8px;
-    transform: translateY(-50%);
-        }
-        
+        --min-padding: 1px;
+        --med-padding: 2px;
+        --max-padding: 5px;
 
+        --min-border-radius: 1px;
+        --med-border-radius: 1px;
+        --large-border-radius: 7px;
+
+        --mini-line-height: 7px;
+        --min-line-height: 8px;
+        --med-line-height: 9px;
+        --max-line-height: 10px;
+
+
+        --micro-font-size: 3px;
+        --mini-font-size: 4px;
+        --min-font-size: 5px;
+        --med-font-size: 7px;
+        --max-font-size: 9px;
+
+        --offset-for-keyboard: 0px
     }
 
 
+    #root {
+        width: 100vw;
+        height: 100vh;
+    }
 
+    .signin-box input[type="text"] {
+        width: 80px;
+        font-size: 10px;
+        height: 10px;
+        display: block
+    }
+
+    .signin-box .country-selector-signin {
+        width: 25px;
+        font-size: 10px;
+        height: 14px;
+    }
+
+    .signin-box> :nth-child(1) {
+        font-size: 0.9rem;
+    }
+
+    
+
+    .signin-box> :nth-child(2)> :nth-last-child(2) {}
+
+    .signin-box> :nth-child(2)> :last-child {
+        font-size: 8px;
+        padding: 0;
+        padding-inline: 10px;
+        padding-block: 2px;
+        line-height: 8px;
+    }
+
+    .user-vs-chat-container>:nth-child(2)>:nth-child(1) .attachment {
+        width: 20px;
+        height: 20px;
+        padding: 0;
+        font-size: 10px;
+    }
+
+    .dashboard>:nth-child(1)>:nth-child(2) {
+        font-size: 10px;
+    }
+
+    .my-contact-field-container:before {
+        content: "● " attr(data-online-users-count) " Online";
+        height: 12px;
+        width: 12px;
+        position: relative;
+        color: var(--professional-blue);
+        margin-left: 8px;
+        font-size: 8px;
+        transform: translateY(-50%);
+    }
+    .signin-box> :last-child {
+        border-radius: 2px;
+        font-size: 4px;
+        width: 25px;
+        height: 20px;
+        
+        padding: 0px;
+        top: -10px;
+        right: -10px;
+        display: none;
+    }
+
+
+}

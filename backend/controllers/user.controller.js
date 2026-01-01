@@ -4,6 +4,8 @@ import { WebSocketServer } from 'ws';
 import { parse } from "url"
 import { initGoogleDrive } from "../db/db.handler.js";
 import { createDriveFolder, downloadFileBufferWithMeta, uploadFileToFolder } from "./file.controller.js";
+import fs from 'fs';
+import path from "path";
 
 
 
@@ -48,15 +50,15 @@ const requestChatToken = async (currentUserPrompt, fewHistory = null) => {
         return errorData?.error?.message
 
     }
-    
+
     try {
         const data = await res.json()
         return data["candidates"][0]["content"]["parts"][0]["text"]
     } catch (error) {
         return error.message;
-    }   
+    }
 
-    
+
 
 
 }
@@ -136,9 +138,11 @@ class Client {
         //  age,
         //  gender,
         country,
-        socket
+        socket,
+        fileMetaDataInfo = null
     ) {
         this.username = username;
+        this.fileMetaDataInfo = fileMetaDataInfo;
 
         this.socket = socket;
         // this.age = age,
@@ -178,6 +182,20 @@ googleDrive = await initGoogleDrive()
 folderId = await createDriveFolder(googleDrive, "GoogleChatAPPDatabaseFilesStorage");
 
 console.log("Folder ID:", folderId);
+
+
+
+const rootDir = process.cwd();
+
+const handlingFilesDir = path.join(rootDir, 'handlingFilesDir');
+
+// Create directory if it doesn't exist
+if (!fs.existsSync(handlingFilesDir)) {
+    fs.mkdirSync(handlingFilesDir);
+    console.log('Assets directory created at:', handlingFilesDir);
+} else {
+    console.log('Assets directory already exists at:', handlingFilesDir);
+}
 
 
 
@@ -271,6 +289,7 @@ export const newConnectionHandler = async (dbname, httpServer, allowedOrigin) =>
             return { username: client.username, country: client.country, id: client.id, unread: false }
         })
         // const client = new Client(username, age, gender, country, socket)
+        socket.username = username;
         const client = new Client(username, country, socket)
 
         activeClients.set(username, client);
@@ -294,6 +313,7 @@ export const newConnectionHandler = async (dbname, httpServer, allowedOrigin) =>
         ))
 
         socket.on("message", async (message, isBinary) => {
+
             if (!isBinary) {
 
                 let data = null
@@ -369,15 +389,15 @@ export const newConnectionHandler = async (dbname, httpServer, allowedOrigin) =>
                         ]
 
                         // here i am sending previous themes of chat contexts if given
-                        if(data.starAiRecentChatContextStack && data.starAiRecentChatContextStack.length>0){
-                            for(let j=0;j<data.starAiRecentChatContextStack.length;j++){
+                        if (data.starAiRecentChatContextStack && data.starAiRecentChatContextStack.length > 0) {
+                            for (let j = 0; j < data.starAiRecentChatContextStack.length; j++) {
                                 extraFeeding.push(data.starAiRecentChatContextStack[j]);
                             }
                         }
 
                         // here i am sending previous themes of chat contexts if given
-                        if(data.starAiRecentVoiceContextStack && data.starAiRecentVoiceContextStack.length>0){
-                            for(let j=0;j<data.starAiRecentVoiceContextStack.length;j++){
+                        if (data.starAiRecentVoiceContextStack && data.starAiRecentVoiceContextStack.length > 0) {
+                            for (let j = 0; j < data.starAiRecentVoiceContextStack.length; j++) {
                                 extraFeeding.push(data.starAiRecentVoiceContextStack[j]);
                             }
                         }
@@ -402,7 +422,7 @@ export const newConnectionHandler = async (dbname, httpServer, allowedOrigin) =>
                             extraFeeding.push(
                                 {
                                     role: "user",
-                                "parts": [{ "text": "In each response from now onwards, return the theme or main idea of what the user requested and your reply, wrapped in a clear marker for easy separation from the actual answer strictly. Format is ‹‹Context›› userRequest: <your request>; modelResponse: <your reply> <nextline> then the actual reponse." }]
+                                    "parts": [{ "text": "In each response from now onwards, return the theme or main idea of what the user requested and your reply, wrapped in a clear marker for easy separation from the actual answer strictly. Format is ‹‹Context›› userRequest: <your request>; modelResponse: <your reply> <nextline> then the actual reponse." }]
 
                                 }
                             )
@@ -614,7 +634,7 @@ export const newConnectionHandler = async (dbname, httpServer, allowedOrigin) =>
                                     sender: sender,
                                     receiver: receiver,
                                     type: "message",
-                                    
+
                                     msg: `${receiver.username} is offline now`
                                 })
                             )
@@ -624,7 +644,7 @@ export const newConnectionHandler = async (dbname, httpServer, allowedOrigin) =>
 
 
                         const fileInfoToSend = data?.msg
-                       
+
 
                         const binaryFileData = await downloadFileBufferWithMeta(googleDrive, fileInfoToSend?.fileId)
                         // buffer name size
@@ -638,7 +658,7 @@ export const newConnectionHandler = async (dbname, httpServer, allowedOrigin) =>
                                     sender: sender,
                                     receiver: receiver,
                                     type: "message",
-                                    
+
                                     msg: `missing info`
                                 })
                             )
@@ -648,7 +668,7 @@ export const newConnectionHandler = async (dbname, httpServer, allowedOrigin) =>
                         }
 
                         // encode meta data with this binary
-                        console.log("attachment: filename: binaryFileData.size: ",binaryFileData.size)
+                        console.log("attachment: filename: binaryFileData.size: ", binaryFileData.size)
                         const str = JSON.stringify(
                             {
                                 type: "attachment",
@@ -705,6 +725,58 @@ export const newConnectionHandler = async (dbname, httpServer, allowedOrigin) =>
 
                     return
                 }
+                else if (type === "file-meta-data-to-server") {
+                    // sender 
+                    // receiver
+                    // type
+                    // message: { filesize: file.size, filename: file.name },
+                    const upcomingFileInfo = data.message;
+
+                    let upcomingFilename = upcomingFileInfo.filename;
+
+                    const upcomingFilesize = upcomingFileInfo.filesize;
+
+                    // this is used
+                    upcomingFilename = sender.id + "_" + receiver.id + "_" + data.createdAt + "_" + upcomingFilename; //modified uniquefilename
+
+
+
+
+
+                    // this is used
+                    const upcomingFilestream = fs.createWriteStream(path.join(handlingFilesDir, upcomingFilename));
+
+                    const client = activeClients.get(sender.username)
+                    if (client.fileMetaDataInfo && client.fileMetaDataInfo.upcomingFilestream) {
+                        console.error("wait a file is already uploading")
+                        return;
+                    }
+                    client.fileMetaDataInfo = {
+
+                        upcomingFilestream: upcomingFilestream,
+                        upcomingFilesize: upcomingFilesize,
+                        totalReceivedBytes: 0,
+                        sender: sender,
+                        receiver: receiver,
+                        createdAt: data.createdAt,
+                        upcomingFilename: upcomingFilename
+
+                    };
+
+                    return socket.send(JSON.stringify(
+                        {
+                            status: "success",
+                            sender: sender,
+                            receiver: receiver,
+                            type: "file-meta-data-response-from-server",
+                            createdAt: data.createdAt,
+                            msg: "yes now send the file",
+                            upcomingFilename: upcomingFilename
+                        }
+                    ))
+
+
+                }
                 else {
                     return console.log("dont have any valid type")
                 }
@@ -712,155 +784,73 @@ export const newConnectionHandler = async (dbname, httpServer, allowedOrigin) =>
 
 
             }
-            else if (Buffer.isBuffer(message)) {
+            else {
+                // BINARY frame
+                const username = socket.username
+                const sender = activeClients.get(username)
+                if (!sender) {
+                    console.log("your trace has been removed")
 
-                const metaDataLen = message.readUInt16BE(0)
-                const metaDataBuffer = message.slice(2, 2 + metaDataLen)
-                console.log(typeof message)
-                console.log(metaDataBuffer.toString("utf-8"))
-                // now decoding the meta data
-                let metaDataObject = null
-                try {
-                    metaDataObject = JSON.parse(metaDataBuffer.toString("utf-8"))
-                } catch (error) {
-                    console.error("something error happened in decoding meta data in attachment", error)
-                    return
-                }
-
-                const sender = metaDataObject?.sender
-                const receiver = metaDataObject?.receiver
-                const createdAt = metaDataObject?.createdAt
-                if (!sender || !receiver) {
-                    console.error("sender or reciever is missing which is required")
-                }
-
-                if (metaDataObject?.type === "attachment") {
-                    // yes its an attachment
-
-                    const filesize = metaDataObject?.message?.filesize || null
-                    const filename = metaDataObject?.message?.filename || null
-
-                    if (!filename || !filesize) {
-                        console.log("file provided is invalid filename or size or missing them")
-                        return
-                    }
-
-                    if (filesize > 1024 * 1024 * 5) return console.error("file is greater then 5 mb cant send it via this protocol")
-
-                    // now send to recipient
-                    const userObject = activeClients.get(receiver.username)
-
-                    if (!userObject || userObject.id !== receiver.id) {
-
-                        return socket.send(JSON.stringify(
-                            {
-                                status: "failed",
-                                sender: sender,
-                                receiver: receiver,
-                                type: "message",
-                                createdAt: createdAt,
-                                msg: "user is now offline"
-                            }
-                        ))
-                    }
-
-                    const currentSocket = userObject.socket
-
-
-
-
-                    if (!currentSocket || currentSocket.readyState !== 1) {
-
-
-                        return socket.send(JSON.stringify(
-                            {
-                                status: "failed",
-                                sender: sender,
-                                receiver: receiver,
-                                type: "message",
-                                createdAt: createdAt,
-                                msg: "recievr is not ready"
-                            }
-                        ))
-                    }
-
-                    // here everything is well
-                    // reconstructing packet
-                    // here i am storing files onn google
-                    if (!folderId) {
-                        console.error("actualy cannot upload on goggle drive cannot find the folder id")
-                        return
-                    }
-                    const fileId = await uploadFileToFolder(googleDrive, filename, folderId, message.slice(2 + metaDataLen, 2 + metaDataLen + filesize))
-
-                    if (!fileId) {
-                        socket.send(JSON.stringify(
-                            {
-                                status: "failed",
-                                sender: sender,
-                                receiver: receiver,
-                                type: "message",
-                                createdAt: createdAt,
-                                msg: "file not saved at google hence not send"
-                            }
-                        ))
-                        return
-                    }
-                    const fileInfoToSend = {
-                        fileId: fileId,
-                        filename: filename,
-                        filesize: filesize
-                    }
-
-
-                    const filedetailsSaved = await createNewOneChat(sender.id, receiver.id, JSON.stringify(fileInfoToSend), createdAt)
-                    // i will ignore here checking whther the mongodb save it or not
-
-
-
-
-                    // now send the details to both
-                    socket.send(JSON.stringify(
+                    return socket.send(JSON.stringify(
                         {
-                            status: "success",
-                            sender: sender,
-                            receiver: receiver,
-                            type: "message",
-                            createdAt: createdAt,
-                            msg: fileInfoToSend
+                            status: "failed",
+                            // sender: socket,
+                            // receiver: receiver,
+                            type: "file-meta-data-response-from-server",
+                            // createdAt: createdAt,
+                            msg: "you are removed"
+                        }
+                    ))
+                }
+                const fileMetaDataInfo = sender.fileMetaDataInfo
+                if (!fileMetaDataInfo) {  // is meta data is not found then i am not sending RECEIVER and CREATEDAT in the error this will key error in frontend
+                    console.error("file meta data was not found.")
+                    return socket.send(JSON.stringify(
+                        {
+                            status: "failed",
+                            sender: { username: sender.username, id: sender.id, country: sender.country },        // { username: props.userRef.current.username, id: props.userRef.current.id, country: props.userRef.current.country }
+                            // receiver: receiver,
+                            type: "file-completed-response-from-server",
+                            // createdAt: createdAt,
+                            msg: "file meta data not found"
                         }
                     ))
 
-
-
-
-                    currentSocket.send(
-                        JSON.stringify(
-                            {
-                                status: "download-button",
-                                sender: sender,
-                                receiver: receiver,
-                                type: "message",
-                                createdAt: createdAt,
-                                msg: fileInfoToSend
-                            }
-                        )
-
-                    )
-                    console.log("file uploaded to google success")
-                    return
-
-
-
-
                 }
-                else {
-                    console.error("cannot find the type of binary buffer using meta data so skipping the request")
-                    return
-                }
+                const upcomingFilesize = fileMetaDataInfo.upcomingFilesize;
 
-            } else {
-                return console.error("unknown type of message (data) is coming")
+                const filestream = fileMetaDataInfo.upcomingFilestream;
+
+                filestream.write(message);
+
+
+
+                sender.fileMetaDataInfo.totalReceivedBytes += message.length;
+
+                if (sender.fileMetaDataInfo.totalReceivedBytes >= upcomingFilesize) {
+                    filestream.end();
+                    sender.fileMetaDataInfo.upcomingFilestream = null;
+                    sender.fileMetaDataInfo = null;
+
+                    console.log("File upload complete.");
+                    return socket.send(JSON.stringify(
+                        {
+                            status: "success",
+                            sender: fileMetaDataInfo.sender,
+                            receiver: fileMetaDataInfo.receiver,
+                            type: "file-completed-response-from-server",
+                            createdAt: fileMetaDataInfo.createdAt,
+                            msg: "file received on server",
+                            upcomingFilename: fileMetaDataInfo.upcomingFilename
+                        }
+                    ))
+                }
+                return;
+
+
+
+
+
             }
 
 

@@ -308,9 +308,14 @@ export function Home(props) {
 
 
                     if (data.sender.id === userRef.current.id) {
-                        // this means i send s message and its response came to me
+                        // this means i sent a message and its response came to me
+                        // i wil only check file conditions which i send to someone as its reponces will come from server only to me 
+                        // no need to check logs of sending file any where other than this scope
 
                         if (data.status === "failed") {
+
+
+                            // below is failed for text msg
 
                             console.error("your msg has been failed", data.msg)
 
@@ -333,7 +338,10 @@ export function Home(props) {
 
 
 
-                        // this is actual message successed for back to me
+
+
+                        // this part is now for success normal messages
+
                         // checks if receiver already in my contacts or not
                         if (!(userRef.current.availableConnectedUsers.some((obj) => (obj.id === data.receiver.id)))) {
 
@@ -378,6 +386,8 @@ export function Home(props) {
                             pendinGlobetFields[i].classList.remove("newly-unupdated-chats")
 
                         }
+
+
 
 
 
@@ -991,6 +1001,117 @@ export function Home(props) {
 
 
 
+                if (data.type === "file-meta-data-response-from-server") { // this is succes and saying send the raw file , permission gained
+
+                    if (data.status === "failed") {// this is failed for file upload
+                        console.error("you cannot upload file", data.msg)
+
+                        const chatsDiv = props.chatsDivRef.current
+
+
+                        const pendinGlobetFields = chatsDiv.querySelectorAll(".newly-unupdated-chats")
+
+                        for (let i = 0; i < pendinGlobetFields.length; i++) {
+
+                            pendinGlobetFields[i].children[1].textContent = `❌`
+
+                            pendinGlobetFields[i].classList.remove("newly-unupdated-chats")
+                        }
+                        alert("file not uploaded");
+                        return;
+                    }
+                 
+
+                    const file = props.chatRef.current.filesToBeSent[data.upcomingFilename];
+                   
+
+                    if (!file) {
+                        console.error("no file present to send");
+                        return;
+                    }
+
+                    const chunkSize = 64 * 1024; // 64 KB
+                    let offset = 0;
+
+                    function sendChunk() {
+                        if (offset >= file.size) return;
+
+                        const slice = file.slice(offset, offset + chunkSize);
+                        const reader = new FileReader();
+
+                        reader.onload = () => {
+
+                            props.socketContainer.current.send(reader.result); // send binary
+                            offset += chunkSize;
+                            sendChunk(); // send next chunk
+                        };
+
+                        reader.readAsArrayBuffer(slice);
+                    }
+                    sendChunk();
+
+                    return;
+
+                }
+                if (data.type === "file-completed-response-from-server") { // this is saying file is received completely
+
+                    if (data.status === "failed") {// this is failed for file upload
+                        console.error("meta data not found in server", data.msg)
+
+                        const chatsDiv = props.chatsDivRef.current
+
+
+                        const pendinGlobetFields = chatsDiv.querySelectorAll(".newly-unupdated-chats")
+
+                        for (let i = 0; i < pendinGlobetFields.length; i++) {
+
+                            pendinGlobetFields[i].children[1].textContent = `❌`
+
+                            pendinGlobetFields[i].classList.remove("newly-unupdated-chats")
+                        }
+                        alert("file not uploaded");
+                        return;
+                    }
+
+                    // this is telling file successfully uploaded
+                    console.log("File upload fully completed!");
+
+                    alert("File upload fully completed!")
+                    props.chatRef.current.filesToBeSent[data.upcomingFilename] = null;
+
+                    const chatsDiv = props.chatsDivRef.current
+
+
+                    const pendinGlobetFields = chatsDiv.querySelectorAll(".newly-unupdated-chats")
+
+                    for (let i = 0; i < pendinGlobetFields.length; i++) {
+
+                        const date = new Date(data.createdAt)
+
+                        const createdAt = date.toLocaleTimeString("en-IN", {
+                            hour: "2-digit",
+                            minute: "2-digit",
+                            hour12: true,
+                        });
+
+
+                        pendinGlobetFields[i].children[1].textContent = `✔ ${createdAt}`
+
+                        pendinGlobetFields[i].classList.remove("newly-unupdated-chats")
+
+                    }
+
+                    // this is finally exiting and your file is uploded
+
+                    return;
+
+
+
+
+                }
+
+
+
                 console.error("invalid data type in response")
                 return
             }
@@ -1510,7 +1631,7 @@ export function Home(props) {
 
                         </form>
                         <button
-                            style={{ backgroundColor: "var(--professional-blue)", textShadow: "0px 0px 10px white", position: "absolute", borderRadius: "50%", width: "50px", height: "50px", display: "flex", justifyContent: "center", alignItems: "center", top: "0", transform: "translateX(-50%)" }}
+                            style={{ backgroundColor: "var(--professional-blue)", textShadow: "0px 0px 10px white", position: "absolute", borderRadius: "50%", width: "50px", height: "50px", justifyContent: "center", alignItems: "center", top: "0", transform: "translateX(-50%)" }}
                             onClick={() => {
 
                                 // const formData = new FormData(document.getElementById("register-form"));
