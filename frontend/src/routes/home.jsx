@@ -190,7 +190,7 @@ export function Home(props) {
 
                         availableConnectedUsers: []
                     }
-                    console.log("first time variable set all users also there ,",data.availableUsers)
+                    console.log("first time variable set all users also there ,", data.availableUsers)
 
 
 
@@ -207,7 +207,7 @@ export function Home(props) {
 
                         userRef.current.availableUsers = data.msg || []
 
-                        console.log("from home route ",userRef.current.availableUsers)
+                        console.log("from home route ", userRef.current.availableUsers)
 
 
 
@@ -283,7 +283,7 @@ export function Home(props) {
                             chatRef.current.availableChats = data.msg
 
                         }
-                        console.log("home but chat part line 285,",chatRef.current.availableChats)
+                        console.log("home but chat part line 285,", chatRef.current.availableChats)
 
 
 
@@ -965,7 +965,8 @@ export function Home(props) {
 
                             pendinGlobetFields[i].classList.remove("newly-unupdated-chats")
                         }
-                        alert("file not uploaded");
+                        // alert("file not uploaded");
+                        console.log("file not uploaded")
                         return;
                     }
 
@@ -1018,14 +1019,16 @@ export function Home(props) {
 
                                 pendinGlobetFields[i].classList.remove("newly-unupdated-chats")
                             }
-                            alert("file not uploaded");
+                            // alert("file not uploaded");
+                            console.error("file not uploaded")
                             return;
                         }
 
                         // this is telling file successfully uploaded
                         console.log("File upload fully completed!");
 
-                        alert("File upload fully completed!")
+                        // alert("File upload fully completed!")
+                        console.log("File uploaded successfully")
                         props.chatRef.current.filesToBeSent[data.fileMetaDataInfo.upcomingFilename] = null;
 
                         const chatsDiv = props.chatsDivRef.current
@@ -1042,6 +1045,8 @@ export function Home(props) {
                                 minute: "2-digit",
                                 hour12: true,
                             });
+
+                            // pendinGlobetFields[i].children[0].classList.add("isLink")
 
                             pendinGlobetFields[i].onclick = () => {
                                 if (props.socketContainer.current.isStillDownloading) {
@@ -1088,7 +1093,8 @@ export function Home(props) {
 
                                 pendinGlobetFields[i].classList.remove("newly-unupdated-chats")
                             }
-                            alert("file not uploaded");
+                            // alert("file not uploaded");
+                            console.log("file not uploaded")
                             return;
                         }
 
@@ -1113,8 +1119,32 @@ export function Home(props) {
                         chatTextField.style.display = "flex"
                         chatTextField.style.flexDirection = "column"
                         chatTextField.style.rowGap = "0"
-                        chatTextField.textContent = data.fileMetaDataInfo.upcomingFilename
-                        chatTextField.style.textDecoration = "underline";
+                        const nameSpan = document.createElement("span")
+                        
+                        // sender.id + "_" + receiver.id + "_" + data.createdAt + "_" + upcomingFilename;
+                        function nthIndex(str, char, n) {
+                            let i = -1;
+                            while (n-- && i++ < str.length) {
+                                i = str.indexOf(char, i);
+                                if (i === -1) break;
+                            }
+                            return i;
+                        }
+                        const idx = nthIndex(data.fileMetaDataInfo.upcomingFilename, "_", 3);
+                        const shortName = data.fileMetaDataInfo.upcomingFilename.slice(idx + 1);
+
+                        nameSpan.textContent = shortName;
+                     
+
+                        const breaklineTag = document.createElement("br")
+                        const sizeSpan = document.createElement("span")
+                        const fileSizeText = (data.fileMetaDataInfo.fileSize < 1024) ? (Math.trunc(data.fileMetaDataInfo.fileSize * 100) / 100 + " B") : ((data.fileMetaDataInfo.fileSize < 1048576) ? (Math.trunc((data.fileMetaDataInfo.fileSize / 1024) * 100) / 100 + " KB") : (Math.trunc((data.fileMetaDataInfo.fileSize / 1048576) * 100) / 100 + " MB"));
+                        sizeSpan.textContent = fileSizeText
+                        chatTextField.append(nameSpan, breaklineTag, sizeSpan)
+
+                        // chatTextField.textContent = data.fileMetaDataInfo.upcomingFilename
+
+                        chatTextField.classList.add("isLink")
                         chatTextField.onclick = () => {
                             props.socketContainer.current.send(JSON.stringify(
                                 {
@@ -1292,6 +1322,7 @@ export function Home(props) {
                         }, 100);
 
                         // Clean up
+                        props.socketContainer.current.isStillDownloading = false
                         props.socketContainer.current.downloadChunks = undefined;
                         props.socketContainer.current.downloadBytesReceived = 0;
                         props.socketContainer.current.downloadTotalBytes = 0;

@@ -99,7 +99,7 @@ export const getChatList = async (senderId, receiverId) => {
             },
             { senderId: 1, receiverId: 1, content: 1, createdAt: 1, isLink: 1, fileSize: 1, _id: 0 }
         ).sort({ createdAt: 1 })
-        console.log("messages", messages)
+        
 
 
         return messages
@@ -279,6 +279,8 @@ if (!fs.existsSync(handlingFilesDir)) {
 
 
 let running = false;
+
+
 
 
 const filesGarbageCollectorInterval = setInterval(async () => {
@@ -789,7 +791,8 @@ export const newConnectionHandler = async (dbname, httpServer, allowedOrigin) =>
                         sender: sender,
                         receiver: receiver,
                         createdAt: data.createdAt,
-                        upcomingFilename: upcomingFilename
+                        upcomingFilename: upcomingFilename,
+                        fileSize: upcomingFilesize
 
                     };
 
@@ -801,7 +804,8 @@ export const newConnectionHandler = async (dbname, httpServer, allowedOrigin) =>
                             type: "file-meta-data-response-from-server",
                             createdAt: data.createdAt,
                             msg: "yes now send the file",
-                            upcomingFilename: upcomingFilename
+                            upcomingFilename: upcomingFilename,
+                            fileSize: upcomingFilesize
                         }
                     ))
 
@@ -904,10 +908,13 @@ export const newConnectionHandler = async (dbname, httpServer, allowedOrigin) =>
                 if (sender.fileMetaDataInfo.totalReceivedBytes >= upcomingFilesize) {
                     filestream.end();
                     sender.fileMetaDataInfo.upcomingFilestream = null;
-                    sender.fileMetaDataInfo = null;
 
                     // here i can attach a chat to db about this file
+                    console.log("showing size when adding on db ",fileMetaDataInfo.fileSize)
                     const result = await createNewOneChat(sender.id, fileMetaDataInfo.receiver.id, fileMetaDataInfo.upcomingFilename, fileMetaDataInfo.createdAt, true, fileMetaDataInfo.fileSize)
+
+                    
+                    sender.fileMetaDataInfo = null;
 
                     if (!result) {
                         // delete file on server also

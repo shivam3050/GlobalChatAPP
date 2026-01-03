@@ -80,8 +80,14 @@ function ChatsRoute(props) {
                     });
                     const file = attachmentFileRef.current.files[0]
 
+                    const previewInstance = attachmentFileRef.current.previewInstance
+
+                    previewInstance?.remove();
+
                     if (file) {
+
                         const chatsDiv = props.chatsDivRef.current
+
 
                         const chatField = document.createElement("div")
 
@@ -95,11 +101,23 @@ function ChatsRoute(props) {
                         chatField.classList.add("newly-unupdated-chats")
 
                         const chatTextField = document.createElement("pre")
-                        chatTextField.style.textDecoration = "underline";
+                        chatTextField.classList.add("isLink")
+
+                        const nameSpan = document.createElement("span")
+                       
+                        nameSpan.textContent = file.name
+                        const breaklineTag = document.createElement("br")
+                        const sizeSpan = document.createElement("span")
+                        const fileSizeText = (file.size < 1024) ? (Math.trunc(file.size * 100) / 100 + " B") : ((file.size < 1048576) ? (Math.trunc((file.size / 1024) * 100) / 100 + " KB") : (Math.trunc((file.size / 1048576) * 100) / 100 + " MB"));
+                        sizeSpan.textContent = fileSizeText
+                        chatTextField.append(nameSpan, breaklineTag, sizeSpan)
+
+
 
                         const chatStatusField = document.createElement("div")
 
-                        chatTextField.textContent = `Name: ${file.name} `
+                        //chatTextField.textContent = `name: ${file.name} \nsize: ${(file.size<1024)?(Math.trunc(file.size*100)/100+" B"):((file.size<1048576)?(Math.trunc((file.size/1024)*100)/100 + " KB"):(Math.trunc((file.size/1048576)*100)/100 + " MB"))}`
+                        // chatTextField.classList.add("isLinks")
 
                         chatStatusField.textContent = `${localTimeOnly}`
 
@@ -139,7 +157,7 @@ function ChatsRoute(props) {
                         attachmentFileRef.current.value = "";
                         const attachmentButton = e.currentTarget.querySelector(".attachment");
 
-                        // Now you can manipulate it, e.g., change innerHTML
+                        // inputPartDiv.removeChild(previewFloater)
                         attachmentButton.innerHTML = `
 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-paperclip" viewBox="0 0 16 16">
     <path d="M4.5 3a2.5 2.5 0 0 1 5 0v9a1.5 1.5 0 0 1-3 0V5a.5.5 0 0 1 1 0v7a.5.5 0 0 0 1 0V3a1.5 1.5 0 1 0-3 0v9a2.5 2.5 0 0 0 5 0V5a.5.5 0 0 1 1 0v7a3.5 3.5 0 1 1-7 0z"/>
@@ -150,7 +168,7 @@ function ChatsRoute(props) {
                         return
                     }
 
-                    if(message.trim()==="") return;
+                    if (message.trim() === "") return;
 
                     const chatsDiv = props.chatsDivRef.current
 
@@ -218,6 +236,11 @@ function ChatsRoute(props) {
 
                     </textarea>
                     <button className="attachment" type="button" onClick={(e) => {
+                        
+                        const previewInstance = attachmentFileRef.current.previewInstance
+
+                        previewInstance?.remove();
+
                         if (attachmentFileRef.current.files.length > 0) {
                             attachmentFileRef.current.value = ""
                             e.currentTarget.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-paperclip" viewBox="0 0 16 16">
@@ -236,6 +259,33 @@ function ChatsRoute(props) {
                     </button>
                     <input ref={attachmentFileRef} style={{ display: "none" }} type="file" name="" onChange={(e) => {
                         if (e.currentTarget.files.length > 0) {
+
+                            const inputPartDiv = e.currentTarget.parentElement // this is input part i am not selecting it by class name or id so if in future you update any elements then do carefully
+                            const previewFloater = document.createElement("span")
+                            previewFloater.style.cssText = `
+                                display: inline-block;
+                                position: absolute;
+                                width: 132px;
+                                height: calc(1.5*var(--nav-height));
+                                border: 1px dotted black;
+                                border-radius: 8px;
+                                background: color-mix(in srgb, var(--darkest-black-user) 80%, transparent);
+                                
+                                bottom: calc(0.5*var(--nav-height));
+                                left: 0px;
+                                z-index: 10;
+                                overflow: hidden;
+                                word-break: break-all;
+                                padding: var(--max-padding);
+                                font-style: italic;
+                                                            
+                            `
+
+                            previewFloater.textContent = e.currentTarget.files[0].name
+                            // previewFloater.classList.add("pickedFilePreview")
+                            inputPartDiv.appendChild(previewFloater)
+                            attachmentFileRef.current.previewInstance = previewFloater
+
                             e.currentTarget.parentElement.querySelector('.attachment').innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-x-circle-fill" viewBox="0 0 16 16">
                                                         <path d="M16 8A8 8 0 1 1 0 8a8 8 0 0 1 16 0M5.354 4.646a.5.5 0 1 0-.708.708L7.293 8l-2.647 2.646a.5.5 0 0 0 .708.708L8 8.707l2.646 2.647a.5.5 0 0 0 .708-.708L8.707 8l2.647-2.646a.5.5 0 0 0-.708-.708L8 7.293z"/>
                                                         </svg>`

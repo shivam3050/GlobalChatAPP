@@ -187,6 +187,22 @@ export const ChatSection = (props) => {
   }
 
 
+  function shortFilename(longname) {
+
+    function nthIndex(str, char, n) {
+      let i = -1;
+      while (n-- && i++ < str.length) {
+        i = str.indexOf(char, i);
+        if (i === -1) break;
+      }
+      return i;
+    }
+    const idx = nthIndex(longname, "_", 3);
+    return longname.slice(idx + 1);
+
+  }
+
+
 
 
   useLayoutEffect(() => {
@@ -239,7 +255,7 @@ export const ChatSection = (props) => {
             {
               (item.senderId === props.userRef.current.id || item.senderId !== props.userRef.current.yourGlobalStarAiReference.id) ? (
                 <>
-                  <p className="main-chat-text pre" style={(item.isLink) ? ({ textDecoration: "underline" }) : ({})} onClick={(item.isLink) ? (() => {
+                  <p className={`main-chat-text pre ${item.isLink ? "isLink" : ""}`} onClick={(item.isLink) ? (() => {
                     if (props.socketContainer.current.isStillDownloading) {
                       console.error("wait a file is already downloading")
                       return
@@ -254,8 +270,12 @@ export const ChatSection = (props) => {
                     ))
 
                   }) : (null)}>
+                    {item.isLink ? (<><span> {shortFilename(item.content)}</span> <br></br>
+                      <span> {
+                        (item.fileSize < 1024) ? (Math.trunc(item.fileSize * 100) / 100 + " B") : ((item.fileSize < 1048576) ? (Math.trunc((item.fileSize / 1024) * 100) / 100 + " KB") : (Math.trunc((item.fileSize / 1048576) * 100) / 100 + " MB"))
+                      }</span></>) : (<>{item.content}</>)}
 
-                    {item.content}
+
 
                   </p>
 
