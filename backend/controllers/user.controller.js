@@ -3,7 +3,7 @@ import { Message } from "../db/message.model.js"
 import { WebSocketServer } from 'ws';
 import { parse } from "url"
 import { initGoogleDrive } from "../db/db.handler.js";
-import { createDriveFolder, downloadFileBufferWithMeta, uploadFileToFolder } from "./file.controller.js";
+import { createDriveFolder } from "./file.controller.js";
 import fs from 'fs';
 import path from "path";
 
@@ -63,13 +63,15 @@ const requestChatToken = async (currentUserPrompt, fewHistory = null) => {
 
 }
 
-export const createNewOneChat = async (senderId, receiverId, content, createdAt = "") => {
+export const createNewOneChat = async (senderId, receiverId, content, createdAt = "", isLink = false, fileSize = 0) => {
     try {
         const message = await Message.create({
             senderId: senderId,
             receiverId: receiverId,
             content: content,
-            createdAt: createdAt
+            createdAt: createdAt,
+            isLink: isLink,
+            fileSize: fileSize
         })
         return message
     } catch (error) {
@@ -79,6 +81,10 @@ export const createNewOneChat = async (senderId, receiverId, content, createdAt 
 }
 
 export const getChatList = async (senderId, receiverId) => {
+    // await Message.updateMany(
+    //     { isLink: { $exists: false } },
+    //     { $set: { isLink: false, fileSize: 0 } }
+    // )
     try {
         const messages = await Message.find(
             {
@@ -91,8 +97,9 @@ export const getChatList = async (senderId, receiverId) => {
                     }
                 ]
             },
-            { senderId: 1, receiverId: 1, content: 1, createdAt: 1, _id: 0 }
+            { senderId: 1, receiverId: 1, content: 1, createdAt: 1, isLink: 1, fileSize: 1, _id: 0 }
         ).sort({ createdAt: 1 })
+        console.log("messages", messages)
 
 
         return messages
@@ -123,14 +130,14 @@ export const deleteUserAllChats = async (userId) => {
         return false
     }
 }
-export const deleteAllAssociatedFiles = async (username, dir) => {
+export const deleteAllAssociatedFiles = async (userid, dir) => {
     try {
 
         if (dir != "handlingFilesDir") return false
 
-        
 
-        const client = activeClients.get(username)
+
+        const client = activeClients.get(userid)
         const fileKeyword = client.id
 
         fs.readdir(dir, (err, files) => {
@@ -153,6 +160,49 @@ export const deleteAllAssociatedFiles = async (username, dir) => {
         return false
     }
 }
+const deleteOneFile = (path) => {
+    try {
+        const ans = fs.unlink(path);
+        return true
+    } catch (err) {
+        console.error(err);
+        return false
+    }
+}
+
+const createReadStreamOfAFile = (filepath) => {
+    if (!fs.existsSync(filepath)) {
+        console.log("File not exist");
+        return null;
+    }
+
+
+    console.log("File exist");
+    return { readStream: fs.createReadStream(filepath), fileSize: fs.statSync(filepath).size };
+}
+const filesGarbageCollectorFunction = async (dir) => {
+    try {
+        const files = await fs.promises.readdir(dir); // returns array of file names
+        const mins = 20 * 60000;
+
+        for (const file of files) {
+            const fullPath = path.join(dir, file);
+            try {
+                const stats = await fs.promises.stat(fullPath);
+
+                if (stats.isFile() && (Date.now() - stats.birthtime.getTime() > mins)) { // greater then 20 minutes
+                    await fs.promises.unlink(fullPath); // delete old file
+                    console.log('Deleted:', file);
+                }
+            } catch {
+                // this means its not a file its a dir so skip it , although this case is never going to happend because i have not kept any dir there
+            }
+        }
+    } catch {
+        return
+    }
+
+};
 
 
 
@@ -228,6 +278,19 @@ if (!fs.existsSync(handlingFilesDir)) {
 }
 
 
+let running = false;
+
+
+const filesGarbageCollectorInterval = setInterval(async () => {
+    if (!running) {
+        running = true;
+        console.log("files garbage collector is running!")
+        await filesGarbageCollectorFunction(handlingFilesDir);
+        running = false;
+    }
+}, 2 * 60000); // 2 minutes frequency
+
+
 
 
 
@@ -244,7 +307,8 @@ const activeClients = new Map()
 // first client will be stars ai
 const StarAI = new Client("StarAI", "nocountry", "socket-to-StarAI")
 
-activeClients.set("StarAI", StarAI)
+activeClients.set(StarAI.id, StarAI)
+console.log("StartAi is active")
 
 export const newConnectionHandler = async (dbname, httpServer, allowedOrigin) => {
 
@@ -279,7 +343,7 @@ export const newConnectionHandler = async (dbname, httpServer, allowedOrigin) =>
         console.log(`ws is running`)
     }
     server.on("connection", (socket, request) => {
-        console.log("connected")
+        console.log("a user just connected")
 
         // await new Promise((resolve) => {
         //     setTimeout(() => { resolve() }, 20000)
@@ -292,6 +356,7 @@ export const newConnectionHandler = async (dbname, httpServer, allowedOrigin) =>
         // const gender = query.gender
 
         const country = query.country
+        
 
 
 
@@ -307,22 +372,25 @@ export const newConnectionHandler = async (dbname, httpServer, allowedOrigin) =>
             socket.close(1008, "this is a reserved username")
             return
         }
-        const user = activeClients.has(username)
+        // const user = activeClients.has(id)
 
-        if (user) {
-            socket.close(1008, "a user already exists")
-            return
-        }
+        // if (user) {
+        //     socket.close(1008, "a user already exists")
+        //     return
+        // }
         // const availableUsers = [...activeClients.entries()].map(([username, client], _, __) => ({ username: client.username, age: client.age, gender: client.gender, country: client.country, id: client.id }))
         const availableUsers = [...activeClients.entries()].map(([username, client], _, __) => {
+            
 
             return { username: client.username, country: client.country, id: client.id, unread: false }
         })
         // const client = new Client(username, age, gender, country, socket)
-        socket.username = username;
         const client = new Client(username, country, socket)
+        socket.id = client.id;
 
-        activeClients.set(username, client);
+        activeClients.set(client.id, client); //     KEY VALUE , ID : AND CLIENT
+
+   
 
 
 
@@ -371,7 +439,7 @@ export const newConnectionHandler = async (dbname, httpServer, allowedOrigin) =>
 
                     const createdAt = data?.createdAt
 
-                    const userObject = activeClients.get(receiver.username)
+                    const userObject = activeClients.get(receiver.id)
 
 
 
@@ -439,7 +507,7 @@ export const newConnectionHandler = async (dbname, httpServer, allowedOrigin) =>
                             extraFeeding.push(
                                 {
                                     role: "user",
-                                    "parts": [{ "text": "Now onwards conversation will go on voice mode so keep your longer responses as small as possible, also if user sometime asks about mode of conversation then tell that it is voice conversation" }]
+                                    "parts": [{ "text": "Now onwards conversation will go on voice mode so keep your responses as small as possible, also if user sometime asks about mode of conversation then tell that it is voice conversation" }]
 
                                 }
                             )
@@ -528,9 +596,6 @@ export const newConnectionHandler = async (dbname, httpServer, allowedOrigin) =>
 
                     const currentSocket = userObject.socket
 
-
-
-
                     if (!currentSocket || currentSocket.readyState !== 1) {
 
 
@@ -617,7 +682,7 @@ export const newConnectionHandler = async (dbname, httpServer, allowedOrigin) =>
                             return console.error("sender or recievr not provided")
                         }
 
-                        const client = activeClients.get(receiver.username)
+                        const client = activeClients.get(receiver.id)
 
                         if (!client || client.id !== receiver.id) {
                             console.error("client id old not matched recievr id new")
@@ -636,7 +701,7 @@ export const newConnectionHandler = async (dbname, httpServer, allowedOrigin) =>
                         }
 
 
-                        socket.send(
+                        return socket.send(
                             JSON.stringify({
                                 status: "success",
                                 sender: sender,
@@ -646,89 +711,12 @@ export const newConnectionHandler = async (dbname, httpServer, allowedOrigin) =>
                                 msg: await getChatList(sender.id, receiver.id)
                             })
                         )
-                        return
+
                     }
-                    if (queryType === "get-small-file") {
 
-                        if (!sender || !receiver) {
-                            return console.error("sender or recievr not provided")
-                        }
-
-                        const client = activeClients.get(receiver.username)
-
-                        if (!client || client.id !== receiver.id) {
-                            console.error("client id old not matched recievr id new")
-                            socket.send(
-                                JSON.stringify({
-                                    status: "failed",
-                                    sender: sender,
-                                    receiver: receiver,
-                                    type: "message",
-
-                                    msg: `${receiver.username} is offline now`
-                                })
-                            )
-
-                            return
-                        }
-
-
-                        const fileInfoToSend = data?.msg
-
-
-                        const binaryFileData = await downloadFileBufferWithMeta(googleDrive, fileInfoToSend?.fileId)
-                        // buffer name size
-
-                        if (!binaryFileData) {
-
-                            console.error("no file found on google drive")
-                            socket.send(
-                                JSON.stringify({
-                                    status: "failed",
-                                    sender: sender,
-                                    receiver: receiver,
-                                    type: "message",
-
-                                    msg: `missing info`
-                                })
-                            )
-
-                            return
-
-                        }
-
-                        // encode meta data with this binary
-                        console.log("attachment: filename: binaryFileData.size: ", binaryFileData.size)
-                        const str = JSON.stringify(
-                            {
-                                type: "attachment",
-                                status: "success",
-
-                                msg: { filesize: binaryFileData.size, filename: binaryFileData.name },
-                                // createdAt: createdAt,
-                                receiver: receiver,
-                                sender: sender
-                            }
-                        )
-                        const metaBuffer = Buffer.from(str, 'utf-8')
-                        if (metaBuffer.length > 65535) {
-                            return console.error('Metadata too large for this attachment');
-                        }
-                        const packet = Buffer.alloc(2 + metaBuffer.length + binaryFileData.buffer.length);
-                        packet.writeUInt16BE(metaBuffer.length, 0);
-                        metaBuffer.copy(packet, 2);
-                        binaryFileData.buffer.copy(packet, 2 + metaBuffer.length);
-
-
-
-                        socket.send(
-                            packet,
-                            { binary: true } // no streaming send it in a one go
-                        )
-                        return
-                    }
 
                     else if (queryType === "refresh-all-user") {
+                        console.log("i have sent the refresh user query")
                         socket.send(
                             JSON.stringify({
                                 status: "success",
@@ -776,10 +764,22 @@ export const newConnectionHandler = async (dbname, httpServer, allowedOrigin) =>
                     // this is used
                     const upcomingFilestream = fs.createWriteStream(path.join(handlingFilesDir, upcomingFilename));
 
-                    const client = activeClients.get(sender.username)
+                    const client = activeClients.get(sender.id)
+
                     if (client.fileMetaDataInfo && client.fileMetaDataInfo.upcomingFilestream) {
                         console.error("wait a file is already uploading")
-                        return;
+                        return socket.send(JSON.stringify(
+                            {
+                                status: "failed",
+                                sender: sender,
+                                receiver: receiver,
+                                type: "file-meta-data-response-from-server",
+                                createdAt: data.createdAt,
+                                msg: "wait file writer is busy",
+                                upcomingFilename: upcomingFilename
+                            }
+                        ))
+
                     }
                     client.fileMetaDataInfo = {
 
@@ -807,6 +807,50 @@ export const newConnectionHandler = async (dbname, httpServer, allowedOrigin) =>
 
 
                 }
+                else if (type === "download-file-request-from-client") {
+                    const fileMetaDataInfo = data.fileMetaDataInfo
+                    const readStreamObject = createReadStreamOfAFile(path.join(handlingFilesDir, fileMetaDataInfo.upcomingFilename))
+                    if (!readStreamObject) {
+                        socket.send(JSON.stringify(
+                            {
+                                status: "failed",
+                                // sender: socket,
+                                // receiver: receiver,
+                                type: "download-file-response-from-server",
+                                // createdAt: createdAt,
+                                msg: "requested file is not present"
+                            }
+                        ))
+                        return
+
+                    }
+
+
+                    socket.send(JSON.stringify(
+                        {
+                            status: "success",
+                            // sender: socket,
+                            // receiver: receiver,
+                            type: "download-file-response-from-server",
+                            // createdAt: createdAt,
+                            fileMetaDataInfo: { filename: fileMetaDataInfo.upcomingFilename, fileSize: readStreamObject.fileSize },
+                            msg: "get ready i am sending you file raw data"
+                        }
+                    ))
+
+                    readStreamObject.readStream.on("data", (data) => {
+                        socket.send(data) // binary/raw
+                    })
+                    readStreamObject.readStream.on("end", () => {
+                        socket.send(JSON.stringify({
+                            status: "done"
+                        })); // optional end marker
+                    });
+
+                    return
+
+
+                }
                 else {
                     return console.log("dont have any valid type")
                 }
@@ -816,8 +860,8 @@ export const newConnectionHandler = async (dbname, httpServer, allowedOrigin) =>
             }
             else {
                 // BINARY frame
-                const username = socket.username
-                const sender = activeClients.get(username)
+                const id = socket.id
+                const sender = activeClients.get(id)
                 if (!sender) {
                     console.log("your trace has been removed")
 
@@ -842,7 +886,7 @@ export const newConnectionHandler = async (dbname, httpServer, allowedOrigin) =>
                             // receiver: receiver,
                             type: "file-completed-response-from-server",
                             // createdAt: createdAt,
-                            msg: "file meta data not found"
+                            msg: "file meta data not found, sent meta data first"
                         }
                     ))
 
@@ -862,8 +906,27 @@ export const newConnectionHandler = async (dbname, httpServer, allowedOrigin) =>
                     sender.fileMetaDataInfo.upcomingFilestream = null;
                     sender.fileMetaDataInfo = null;
 
+                    // here i can attach a chat to db about this file
+                    const result = await createNewOneChat(sender.id, fileMetaDataInfo.receiver.id, fileMetaDataInfo.upcomingFilename, fileMetaDataInfo.createdAt, true, fileMetaDataInfo.fileSize)
+
+                    if (!result) {
+                        // delete file on server also
+                        deleteOneFile(path.join(handlingFilesDir, fileMetaDataInfo.upcomingFilename))
+                        // i will not confirm the deletion here
+                        return socket.send(
+                            JSON.stringify({
+                                status: "failed",
+                                sender: sender,
+                                receiver: fileMetaDataInfo.receiver,
+                                type: "message",
+                                createdAt: fileMetaDataInfo.createdAt,
+                                msg: "chat not created in db of the uploaded file"
+                            })
+                        )
+                    }
+
                     console.log("File upload complete.");
-                    return socket.send(JSON.stringify(
+                    socket.send(JSON.stringify(
                         {
                             status: "success",
                             sender: fileMetaDataInfo.sender,
@@ -871,9 +934,32 @@ export const newConnectionHandler = async (dbname, httpServer, allowedOrigin) =>
                             type: "file-completed-response-from-server",
                             createdAt: fileMetaDataInfo.createdAt,
                             msg: "file received on server",
-                            upcomingFilename: fileMetaDataInfo.upcomingFilename
+                            fileMetaDataInfo: { upcomingFilename: fileMetaDataInfo.upcomingFilename, fileSize: fileMetaDataInfo.fileSize }
                         }
                     ))
+                    // now i can send this link to another person also
+                    const receiver = activeClients.get(fileMetaDataInfo.receiver.id)
+                    // but i am not checking that receiver exists or not and not notifying to the sender about unavailbility of receiver
+                    if (!receiver) {
+                        return // just doing nothing, but later improve this
+                    }
+                    const currentSocket = receiver.socket
+
+                    if (!currentSocket || currentSocket.readyState !== 1) {
+                        return // just doing nothing, but later improve this
+                    }
+                    currentSocket.send(JSON.stringify(
+                        {
+                            status: "success",
+                            sender: fileMetaDataInfo.sender,
+                            receiver: fileMetaDataInfo.receiver,
+                            type: "file-completed-response-from-server",
+                            createdAt: fileMetaDataInfo.createdAt,
+                            msg: "file received on server",
+                            fileMetaDataInfo: { upcomingFilename: fileMetaDataInfo.upcomingFilename, fileSize: fileMetaDataInfo.fileSize }
+                        }
+                    ))
+                    return
                 }
                 return;
 
@@ -889,19 +975,12 @@ export const newConnectionHandler = async (dbname, httpServer, allowedOrigin) =>
 
 
 
-
-
-
-
-
-
-
         socket.on("close", async () => {
             console.log("Client disconnected");
             socket.close(1000, "logout you out")
-            await deleteUserAllChats(username)
-            await deleteAllAssociatedFiles(username, handlingFilesDir)
-            activeClients.delete(username)
+            await deleteUserAllChats(client.id)
+            await deleteAllAssociatedFiles(client.id, handlingFilesDir)
+            activeClients.delete(client.id)
             return
 
         });
@@ -910,9 +989,9 @@ export const newConnectionHandler = async (dbname, httpServer, allowedOrigin) =>
             console.error("WebSocket error:", error);
 
             socket.close(1011, "logged you out due to some error")
-            await deleteUserAllChats(username)
-            await deleteAllAssociatedFiles(username, handlingFilesDir)
-            activeClients.delete(username)
+            await deleteUserAllChats(client.id)
+            await deleteAllAssociatedFiles(client.id, handlingFilesDir)
+            activeClients.delete(client.id)
             return
         });
     });
@@ -920,6 +999,7 @@ export const newConnectionHandler = async (dbname, httpServer, allowedOrigin) =>
     server.on("error", (error) => {
         console.error("WebSocket server error:", error);
         activeClients = null;
+        //// fs.rmdir(handlingFilesDir,{ recursive: true, force: true })
         return
     });
 }

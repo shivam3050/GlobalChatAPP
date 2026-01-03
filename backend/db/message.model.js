@@ -16,6 +16,14 @@ const messageSchema = new Schema({
   createdAt: {
     type: Number,
     // required: true
+  },
+  isLink: {
+    type: Boolean,
+    default: false
+  },
+  fileSize: {
+    type: Number,
+    default: 0
   }
 },
 //  { timestamps: true }

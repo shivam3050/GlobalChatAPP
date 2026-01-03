@@ -190,6 +190,7 @@ export function Home(props) {
 
                         availableConnectedUsers: []
                     }
+                    console.log("first time variable set all users also there ,",data.availableUsers)
 
 
 
@@ -205,6 +206,8 @@ export function Home(props) {
 
 
                         userRef.current.availableUsers = data.msg || []
+
+                        console.log("from home route ",userRef.current.availableUsers)
 
 
 
@@ -225,14 +228,11 @@ export function Home(props) {
 
                         if (data.sender.id !== userRef.current.id) {
                             //this is not for me  which i have queried when click on a user
-                            console.error("query respose is not for me")
+                            console.error("query respose is not for me, someone else queried")
                             return
                         }
 
-
-
-
-
+                        // this is my answer of query
 
 
 
@@ -283,6 +283,7 @@ export function Home(props) {
                             chatRef.current.availableChats = data.msg
 
                         }
+                        console.log("home but chat part line 285,",chatRef.current.availableChats)
 
 
 
@@ -723,60 +724,7 @@ export function Home(props) {
                         //actual msg from focused otther than ai
 
 
-                        //status == attachment
 
-                        if (data.status === "download-button") {
-                            const chatsDiv = props.chatsDivRef.current
-                            const date = new Date(data.createdAt)
-
-                            const createdAt = date.toLocaleTimeString("en-IN", {
-                                hour: "2-digit",
-                                minute: "2-digit",
-                                hour12: true,
-                            });
-
-                            const chatField = document.createElement("div")
-                            chatField.style.alignSelf = "flex-start"
-                            chatField.style.maxWidth = "80%"
-                            const chatTextFieldButton = document.createElement("button")
-                            chatTextFieldButton.type = "button"
-
-                            chatTextFieldButton.style.display = "flex"
-                            chatTextFieldButton.style.flexDirection = "column"
-                            chatTextFieldButton.style.rowGap = "0"
-                            const fileId = data.msg.fileId
-                            const filename = data.msg.filename
-                            const filesize = data.msg.filesize
-                            chatTextFieldButton.textContent = `${filename} ${filesize}`
-
-                            chatTextFieldButton.onclick = () => {
-                                props.socketContainer.current.send(JSON.stringify(
-                                    {
-                                        status: "success",
-                                        sender: data.sender,
-                                        receiver: data.receiver,
-                                        type: "query-message",
-                                        queryType: "get-small-file",
-                                        createdAt: createdAt,
-                                        msg: data.msg
-                                    }
-                                ))
-                            }
-
-
-                            chatField.appendChild(chatTextFieldButton)
-
-                            const chatStatusField = document.createElement("div")
-                            chatStatusField.textContent = createdAt
-                            chatStatusField.style.marginTop = "var(--max-margin)"
-                            chatField.appendChild(chatStatusField)
-
-
-                            chatsDiv.appendChild(chatField)
-
-                            chatsDiv?.scrollTo({ top: chatsDiv?.scrollHeight, behavior: 'smooth' })
-                            return
-                        }
                         const chatsDiv = props.chatsDivRef.current
                         const date = new Date(data.createdAt)
 
@@ -1020,10 +968,10 @@ export function Home(props) {
                         alert("file not uploaded");
                         return;
                     }
-                 
+
 
                     const file = props.chatRef.current.filesToBeSent[data.upcomingFilename];
-                   
+
 
                     if (!file) {
                         console.error("no file present to send");
@@ -1054,9 +1002,31 @@ export function Home(props) {
 
                 }
                 if (data.type === "file-completed-response-from-server") { // this is saying file is received completely
+                    if (data.sender.id === userRef.current.id) {
+                        // you was the sender yourself
+                        if (data.status === "failed") {// this is failed for file upload
+                            console.error("meta data not found in server", data.msg)
 
-                    if (data.status === "failed") {// this is failed for file upload
-                        console.error("meta data not found in server", data.msg)
+                            const chatsDiv = props.chatsDivRef.current
+
+
+                            const pendinGlobetFields = chatsDiv.querySelectorAll(".newly-unupdated-chats")
+
+                            for (let i = 0; i < pendinGlobetFields.length; i++) {
+
+                                pendinGlobetFields[i].children[1].textContent = `❌`
+
+                                pendinGlobetFields[i].classList.remove("newly-unupdated-chats")
+                            }
+                            alert("file not uploaded");
+                            return;
+                        }
+
+                        // this is telling file successfully uploaded
+                        console.log("File upload fully completed!");
+
+                        alert("File upload fully completed!")
+                        props.chatRef.current.filesToBeSent[data.fileMetaDataInfo.upcomingFilename] = null;
 
                         const chatsDiv = props.chatsDivRef.current
 
@@ -1065,27 +1035,67 @@ export function Home(props) {
 
                         for (let i = 0; i < pendinGlobetFields.length; i++) {
 
-                            pendinGlobetFields[i].children[1].textContent = `❌`
+                            const date = new Date(data.createdAt)
+
+                            const createdAt = date.toLocaleTimeString("en-IN", {
+                                hour: "2-digit",
+                                minute: "2-digit",
+                                hour12: true,
+                            });
+
+                            pendinGlobetFields[i].onclick = () => {
+                                if (props.socketContainer.current.isStillDownloading) {
+                                    console.error("wait a file is already downloading")
+                                    return
+                                }
+                                props.socketContainer.current.send(JSON.stringify(
+                                    {
+                                        type: "download-file-request-from-client",
+                                        sender: data.sender,
+                                        receiver: data.receiver,
+                                        fileMetaDataInfo: data.fileMetaDataInfo
+                                    }
+                                ))
+                            }
+
+
+
+
+
+                            pendinGlobetFields[i].children[1].textContent = `✔ ${createdAt}`
 
                             pendinGlobetFields[i].classList.remove("newly-unupdated-chats")
+
                         }
-                        alert("file not uploaded");
-                        return;
+
+                        // this is finally exiting and your file is uploded
+
+                        return
+
                     }
+                    if (data.sender.id === userRef.current.focusedContact?.id) {
+                        if (data.status === "failed") {// this is failed for file upload
+                            console.error("the impossible case happening , as there is no protocol which tell you that unsuccessfull file is received", data.msg)
 
-                    // this is telling file successfully uploaded
-                    console.log("File upload fully completed!");
-
-                    alert("File upload fully completed!")
-                    props.chatRef.current.filesToBeSent[data.upcomingFilename] = null;
-
-                    const chatsDiv = props.chatsDivRef.current
+                            const chatsDiv = props.chatsDivRef.current
 
 
-                    const pendinGlobetFields = chatsDiv.querySelectorAll(".newly-unupdated-chats")
+                            const pendinGlobetFields = chatsDiv.querySelectorAll(".newly-unupdated-chats")
 
-                    for (let i = 0; i < pendinGlobetFields.length; i++) {
+                            for (let i = 0; i < pendinGlobetFields.length; i++) {
 
+                                pendinGlobetFields[i].children[1].textContent = `❌`
+
+                                pendinGlobetFields[i].classList.remove("newly-unupdated-chats")
+                            }
+                            alert("file not uploaded");
+                            return;
+                        }
+
+                        // this is telling file successfully uploaded
+                        console.log("you got a file link from a sender");
+
+                        const chatsDiv = props.chatsDivRef.current
                         const date = new Date(data.createdAt)
 
                         const createdAt = date.toLocaleTimeString("en-IN", {
@@ -1095,13 +1105,136 @@ export function Home(props) {
                         });
 
 
-                        pendinGlobetFields[i].children[1].textContent = `✔ ${createdAt}`
+                        const chatField = document.createElement("div")
+                        chatField.style.alignSelf = "flex-start"
+                        chatField.style.maxWidth = "80%"
+                        const chatTextField = document.createElement("pre")
 
-                        pendinGlobetFields[i].classList.remove("newly-unupdated-chats")
+                        chatTextField.style.display = "flex"
+                        chatTextField.style.flexDirection = "column"
+                        chatTextField.style.rowGap = "0"
+                        chatTextField.textContent = data.fileMetaDataInfo.upcomingFilename
+                        chatTextField.style.textDecoration = "underline";
+                        chatTextField.onclick = () => {
+                            props.socketContainer.current.send(JSON.stringify(
+                                {
+                                    type: "download-file-request-from-client",
+                                    sender: data.sender,
+                                    receiver: data.receiver,
+                                    fileMetaDataInfo: data.fileMetaDataInfo
+                                }
+                            ))
+                        }
 
+
+                        chatField.appendChild(chatTextField)
+
+                        const chatStatusField = document.createElement("div")
+                        chatStatusField.textContent = createdAt
+                        chatStatusField.style.marginTop = "var(--max-margin)"
+                        chatField.appendChild(chatStatusField)
+
+
+                        chatsDiv.appendChild(chatField)
+
+                        chatsDiv?.scrollTo({ top: chatsDiv?.scrollHeight, behavior: 'smooth' })
+
+
+
+
+                        // this is finally exiting
+
+                        return
+                    }
+                    if (data.receiver && data.sender.id !== userRef.current.focusedContact?.id) {
+
+
+                        // THIS IS THE CONDITION WHERE RECEIVER IS NOT FOCUSED BUT MESSAGE CAME FROM HIM
+
+
+                        if (data.status === "failed") {
+                            console.error("impossible case is happening again, no protocol was there which send failed file link to receiver")
+                            return
+                        }
+
+
+
+                        // checks if receiver already in my contacts or not
+
+                        let searchFound = false
+
+                        for (let i = 0; i < userRef.current.availableConnectedUsers.length; i++) {
+
+                            if (userRef.current.availableConnectedUsers[i].id === data.sender.id) {
+                                // this condition shows random sender is in your recent contacts already
+                                userRef.current.availableConnectedUsers[i].unread = true
+                                searchFound = true
+                                props.setRefreshUsersFlag((prev) => (prev + 1))
+
+                                userRef.current.availableConnectedUsersUnreadLength += 1
+
+                                props.setRecentUnreadContactCount(userRef.current.availableConnectedUsersUnreadLength)
+
+                                break
+                            }
+
+                        }
+
+                        if (!searchFound) {
+
+                            // this is means this user is not present in available contacts
+
+
+
+                            userRef.current.availableConnectedUsers.push(
+
+                                {
+
+                                    username: data.sender.username,
+                                    // age: data.sender.age,
+                                    // gender: data.sender.gender,
+                                    country: data.sender.country,
+                                    id: data.sender.id,
+                                    unread: true
+
+                                }
+                            )
+
+                            userRef.current.availableConnectedUsersUnreadLength += 1
+
+                            props.setRecentUnreadContactCount(userRef.current.availableConnectedUsersUnreadLength)
+
+
+                            props.setRefreshUsersFlag((prev) => (prev + 1))
+
+
+
+
+                        }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+                        // if (!inboxIconRef.current.classList.contains("svg-container-inbox-icon")) {
+
+
+                        //     inboxIconRef.current.classList.add("svg-container-inbox-icon")
+
+
+                        // }
+                        return
                     }
 
-                    // this is finally exiting and your file is uploded
 
                     return;
 
@@ -1109,37 +1242,64 @@ export function Home(props) {
 
 
                 }
+                if (data.type === "download-file-response-from-server") {
+                    if (data.status === "failed") {
+                        console.error("cannot download the file", data.msg)
+                        return
+                    }
+
+
+
+                    props.socketContainer.current.isStillDownloading = true
+                    props.socketContainer.current.downloadChunks = [];
+                    props.socketContainer.current.downloadBytesReceived = 0;
+                    props.socketContainer.current.downloadTotalBytes = data.fileMetaDataInfo.fileSize;
+                    props.socketContainer.current.downloadFilename = data.fileMetaDataInfo.filename;
+                    console.log("filename ", data.fileMetaDataInfo.filename)
+                    console.log("filesize ", data.fileMetaDataInfo.fileSize)
+
+
+
+                    return
+                }
 
 
 
                 console.error("invalid data type in response")
                 return
             }
-            else if (message.data instanceof ArrayBuffer) {
-                // recieving a file smaller than 5 mb
-                const uint8 = new Uint8Array(message.data);
-                const metaLength = (uint8[0] << 8) | uint8[1];
+            else {
+                if (props.socketContainer.current.downloadChunks !== undefined) {
+                    const chunk = new Uint8Array(message.data);
+                    props.socketContainer.current.downloadChunks.push(chunk);
+                    props.socketContainer.current.downloadBytesReceived += chunk.byteLength;
 
-                // Metadata
-                const metaUint8 = uint8.slice(2, 2 + metaLength);
-                const metaStr = new TextDecoder().decode(metaUint8);
-                const metadata = JSON.parse(metaStr);
+                    // Check if download is complete
+                    if (props.socketContainer.current.downloadBytesReceived >= props.socketContainer.current.downloadTotalBytes) {
+                        // Combine all chunks into a blob
+                        const blob = new Blob(props.socketContainer.current.downloadChunks);
+                        const downloadUrl = URL.createObjectURL(blob);
+                        const a = document.createElement("a");
+                        a.href = downloadUrl;
+                        a.download = props.socketContainer.current.downloadFilename;
+                        document.body.appendChild(a);
+                        a.click();
+                        document.body.removeChild(a);
 
-                const fileUint8 = uint8.slice(2 + metaLength);
+                        // Clean up after a delay to ensure download starts
+                        setTimeout(() => {
+                            URL.revokeObjectURL(downloadUrl);
+                        }, 100);
 
-                console.log('Metadata:', metadata);
-                console.log('File Uint8Array length:', fileUint8.length);
-
-                // Optional: create Blob and download
-                const blob = new Blob([fileUint8]);
-                const link = document.createElement('a');
-                link.href = URL.createObjectURL(blob);
-                link.download = metadata.msg.filename;
-                link.click();
-
+                        // Clean up
+                        props.socketContainer.current.downloadChunks = undefined;
+                        props.socketContainer.current.downloadBytesReceived = 0;
+                        props.socketContainer.current.downloadTotalBytes = 0;
+                        props.socketContainer.current.downloadFilename = null;
+                        console.log("Download completed successfully");
+                    }
+                }
                 return
-            } else {
-                return console.error("recived some unknown type of message neighter string nor blob")
             }
 
         }
@@ -1590,11 +1750,11 @@ export function Home(props) {
 
                         </section> */}
 
-                            <section className="selectbar-container" defaultValue="United States">
+                            <section className="selectbar-container" >
                                 <fieldset >
 
                                     <legend>Country</legend>
-                                    <select className="country-selector-signin" name="country">
+                                    <select className="country-selector-signin" name="country" defaultValue="United States">
                                         <option style={{ visibility: "hidden" }} value="">{"▼"}</option>
 
                                         {countries.map((country, index) => (

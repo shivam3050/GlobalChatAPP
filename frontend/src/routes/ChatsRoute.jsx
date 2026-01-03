@@ -54,7 +54,7 @@ function ChatsRoute(props) {
 
     return (
         <aside className="user-vs-chat-container" >
-            <ChatSection userRef={props.userRef} chatRef={props.chatRef} refreshChatsFlag={props.refreshChatsFlag} chatsDivRef={props.chatsDivRef} />
+            <ChatSection userRef={props.userRef} chatRef={props.chatRef} socketContainer={props.socketContainer} refreshChatsFlag={props.refreshChatsFlag} chatsDivRef={props.chatsDivRef} />
             <form className="formCreateChat" action="" method="post"
                 onSubmit={(e) => {
 
@@ -95,6 +95,7 @@ function ChatsRoute(props) {
                         chatField.classList.add("newly-unupdated-chats")
 
                         const chatTextField = document.createElement("pre")
+                        chatTextField.style.textDecoration = "underline";
 
                         const chatStatusField = document.createElement("div")
 
