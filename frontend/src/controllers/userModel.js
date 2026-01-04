@@ -92,3 +92,30 @@ export const chatsRef = {
         // }
     ]
 }
+
+export const webRTCContainerRef = {
+
+    senderPC : null,
+    receiverPC : null,
+    senderPreviousMotive : "",
+    receiverPreviousMotive : "",
+    senderStreamsObject : null,
+    senderTracksContainerArray : [],
+
+    senderDC : null,
+    receiverDC : null,
+
+    senderTC : null,
+    receiverTC : null,
+
+    streamElementAtSender : null,
+    streamElementParentAtSender : null,
+
+    streamElementAtReceiver : null,
+    streamElementParentAtReceiver : null,
+
+    webRTCStartFunction : null,
+    webRTCStopFunction : null
+
+
+}

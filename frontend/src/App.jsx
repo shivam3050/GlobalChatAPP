@@ -5,7 +5,7 @@ import ChatsRoute from './routes/ChatsRoute';
 import { Home } from './routes/home'
 import { useEffect, useRef, useState } from "react"
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
-import { userRef as userSchema, chatsRef as chatSchema } from '../src/controllers/userModel.js';
+import { userRef as userSchema, chatsRef as chatSchema, webRTCContainerRef as webRTCContainerRefSchema } from '../src/controllers/userModel.js';
 import { countries } from './controllers/allCountries.js';
 
 
@@ -34,6 +34,8 @@ function App() {
   const userRef = useRef(userSchema)
 
   const chatRef = useRef(chatSchema)
+
+  const webRTCContainerRef = useRef(webRTCContainerRefSchema)
 
   const CountryMap = new Map(
     countries.map((country) => ([country.countryName, country]))
@@ -105,7 +107,7 @@ function App() {
 
   }, [])
 
-  rtcStarterFunction.current = async (motive = null) => {
+  webRTCContainerRef.current.webRTCStartFunction = async (motive = null) => {
     try {
       // Check WebSocket is ready
       if (!socketContainer.current || socketContainer.current.readyState !== 1) {
@@ -113,44 +115,52 @@ function App() {
         return;
       }
 
-      const pc = new RTCPeerConnection();
-      webrtcContainer.current.pc = pc;
-      let dc = null;
+      if (webRTCContainerRef.current.senderPC || webRTCContainerRef.current.receiverPC) {
+        console.error("sorry a connection already exists, first close that.")
+        return;
+      }
+
+      webRTCContainerRef.current.senderPC = new RTCPeerConnection();
+
+      webRTCContainerRef.current.senderDC = null;
       if (motive === "text") {
-        dc = pc.createDataChannel("text")
+        webRTCContainerRef.current.senderDC = webRTCContainerRef.current.senderPC.createDataChannel("text")
       } else if (motive === "binary") {
-        dc = pc.createDataChannel("binary")
+        webRTCContainerRef.current.senderDC = webRTCContainerRef.current.senderPC.createDataChannel("binary")
       } else if (motive === "json") {
-        dc = pc.createDataChannel("json")
+        webRTCContainerRef.current.senderDC = webRTCContainerRef.current.senderPC.createDataChannel("json")
       } else if (motive === "mediastream") {
 
-        const aStream = await navigator.mediaDevices.getUserMedia({ video: true });
-        const audioTrack = aStream.getTracks()[0]
-        webrtcContainer.current.localStream = audioTrack; // currently only one track i am using // storing for reference when time to stop camera
-        pc.addTrack(audioTrack, aStream)
+        webRTCContainerRef.current.senderStreamsObject = await navigator.mediaDevices.getUserMedia({ video: true });
+        webRTCContainerRef.current.senderTracksContainerArray = []
+        webRTCContainerRef.current.senderTracksContainerArray = webRTCContainerRef.current.senderStreamsObject.getTracks()
+        webRTCContainerRef.current.senderTracksContainerArray.forEach(track => webRTCContainerRef.current.senderPC.addTrack(track, webRTCContainerRef.current.senderStreamsObject))
+        // webrtcContainer.current.localStream = audioTrack; // currently only one track i am using // storing for reference when time to stop camera
+        // webrtcContainer.current.aStream = aStream; // currently this the stream , currntly only one stream of video tracks i am using , this stream can contains video + audio two three four tracks , and as well as streams can also be multiple and tracks per stream also be multiple
+
 
       } else {
-        dc = pc.createDataChannel("text")
+        webRTCContainerRef.current.senderDC = webRTCContainerRef.current.senderPC.createDataChannel("text")
         console.log("no motive provided for rtc, assuming default text motive and creating data channel")
       }
 
-      if (!dc) {
+      if (!webRTCContainerRef.current.senderDC) {
         // pass
       } else {
 
-        webrtcContainer.current.dc = dc;
 
-        webrtcContainer.current.dc.onopen = () => {
+
+        webRTCContainerRef.current.senderDC.onopen = () => {
           console.log("Data channel open");
-          webrtcContainer.current.dc.send("Hello Sir");
+          webRTCContainerRef.current.senderDC.send("Hello Sir");
 
         };
-        webrtcContainer.current.dc.onmessage = (e) => {
+        webRTCContainerRef.current.senderDC.onmessage = (e) => {
           console.log("Message from receiver:", e.data);
           alert(e.data)
         };
 
-        dc.onerror = (err) => console.error("Data channel error:", err);
+        webRTCContainerRef.current.senderDC.onerror = (err) => console.error("Data channel error:", err);
 
       }
 
@@ -158,7 +168,7 @@ function App() {
 
 
 
-      pc.onicecandidate = (e) => {
+      webRTCContainerRef.current.senderPC.onicecandidate = (e) => {
         if (e.candidate) {
           try {
             //THIS IS SIGNAL TO WS SERVER
@@ -182,9 +192,9 @@ function App() {
 
 
       // Create and send offer , 
-      const offer = await webrtcContainer.current.pc.createOffer();
+      const offer = await webRTCContainerRef.current.senderPC.createOffer();
 
-      await webrtcContainer.current.pc.setLocalDescription(offer);
+      await webRTCContainerRef.current.senderPC.setLocalDescription(offer);
 
       // Sending via websocket , this will hit server first
       //THIS IS SIGNAL TO WS SERVER
@@ -199,88 +209,124 @@ function App() {
       );
 
       // Cleanup on connection close
-      webrtcContainer.current.pc.onconnectionstatechange = () => {
+      webRTCContainerRef.current.senderPC.onconnectionstatechange = () => {
 
-        if (webrtcContainer.current.pc.connectionState === "connected") {
+        if (webRTCContainerRef.current.senderPC.connectionState === "connected") {
           rtcbuttonRef.current.style.backgroundColor = "red";
+
+          if (webRTCContainerRef.current.senderTracksContainerArray[0]?.kind) { // assuming first will be video am only video will be only show to sender as a preview only
+            if(webRTCContainerRef.current.streamElementAtSender && webRTCContainerRef.current.streamElementAtSender.parentNode){
+              webRTCContainerRef.current.streamElementAtSender.remove()
+            }
+            webRTCContainerRef.current.streamElementAtSender = document.createElement(webRTCContainerRef.current.senderTracksContainerArray[0].kind)
+            webRTCContainerRef.current.streamElementAtSender.srcObject = webRTCContainerRef.current.senderStreamsObject
+            webRTCContainerRef.current.streamElementAtSender.autoplay = true
+
+            webRTCContainerRef.current.streamElementAtSender.style.zIndex = "20";
+            webRTCContainerRef.current.streamElementAtSender.style.width = "clamp(100px,80%,500px)"
+
+
+
+           
+
+            webRTCContainerRef.current.streamElementParentAtSender = document.getElementById("chats-div") // this may not be active "" THIS IS WHERE VIDEO OR THE ELEMENT TO BE SHOWN""
+            if (webRTCContainerRef.current.streamElementParentAtSender) {
+              
+              webRTCContainerRef.current.streamElementParentAtSender.appendChild(webRTCContainerRef.current.streamElementAtSender)
+
+            }
+          }
           rtcbuttonRef.current.onclick = (e) => {
 
             e.stopPropagation();
 
-            // 1️⃣ STOP all sender tracks
-            if (webrtcContainer.current.pc) {
-              webrtcContainer.current.pc.getSenders().forEach(sender => {
+            // STOP all sender tracks
+            if (webRTCContainerRef.current.senderPC) {
+              webRTCContainerRef.current.senderPC.getSenders().forEach(sender => {
                 if (sender.track) {
                   sender.track.stop();          // HARD stop camera
-                  webrtcContainer.current.pc.removeTrack(sender); // DETACH sender
+                  webRTCContainerRef.current.senderPC.removeTrack(sender); // DETACH sender
                 }
               });
+             
+            }
+            if (webRTCContainerRef.current.streamElementAtSender && webRTCContainerRef.current.streamElementParentAtSender) {
+
+              webRTCContainerRef.current.streamElementParentAtSender.removeChild(webRTCContainerRef.current.streamElementAtSender)
+              console.log("your element removed")
+
             }
 
             // Close track
-            if (webrtcContainer.current.tc) {
-              webrtcContainer.current.tc.stop();
-              const playingElement = webrtcContainer.current.tc?.playingElement
-              if (playingElement) {
-                // remove from dom .remove() and 
-                if (rtcbuttonRef.current.contains(playingElement)) {
-                  rtcbuttonRef.current.removeChild(playingElement)
-                }
-                webrtcContainer.current.tc.playingElement = null
-              }
-              if (webrtcContainer.current.localStream) {
-                webrtcContainer.current.localStream.stop()
-              }
-              webrtcContainer.current.tc = null;
+            if (webRTCContainerRef.current.senderTC) { // your side means sender side bcz this is inside onclick
+              webRTCContainerRef.current.senderTracksContainerArray.forEach(track => { track.stop() })
+              webRTCContainerRef.current.senderTC.stop();
+
+
+              webRTCContainerRef.current.senderTC = null;
               console.log("tc closed")
             }
 
             // Close the data channel first
-            if (webrtcContainer.current.dc) {
-              webrtcContainer.current.dc.close();
+            if (webRTCContainerRef.current.senderDC) {
+              webRTCContainerRef.current.senderDC.close();
               console.log("data channel closed")
-              webrtcContainer.current.dc = null;
+              webRTCContainerRef.current.senderDC = null;
             }
 
             // Then close the peer connection
-            if (webrtcContainer.current.pc) {
-              webrtcContainer.current.pc.close();
+            if (webRTCContainerRef.current.senderPC) {
+              webRTCContainerRef.current.senderPC.close();
               console.log("full connection closed")
-              webrtcContainer.current.pc = null;
+              webRTCContainerRef.current.senderPC = null;
             }
-            rtcbuttonRef.current.onclick = rtcStarterFunction;
+            webRTCContainerRef.current.receiverPC = null;
+
+            rtcbuttonRef.current.onclick = ()=> {webRTCContainerRef.current.webRTCStartFunction("mediastream")};
             rtcbuttonRef.current.style.backgroundColor = "transparent";
 
           }
         }
         // Only cleanup if connection actually failed or closed
-        if (webrtcContainer.current.pc && (webrtcContainer.current.pc.connectionState === "failed" || webrtcContainer.current.pc.connectionState === "closed")) {
+        if (webRTCContainerRef.current.senderPC && (webRTCContainerRef.current.senderPC.connectionState === "failed" || webRTCContainerRef.current.senderPC.connectionState === "closed")) {
 
           console.log("Connection failed/closed, cleaning up");
 
-          // 1️⃣ STOP all sender tracks
-            if (webrtcContainer.current.pc) {
-              webrtcContainer.current.pc.getSenders().forEach(sender => {
-                if (sender.track) {
-                  sender.track.stop();          // HARD stop camera
-                  webrtcContainer.current.pc.removeTrack(sender); // DETACH sender
-                }
-              });
-            }
+          // STOP all sender tracks
+          if (webRTCContainerRef.current.senderPC) {
+            webRTCContainerRef.current.senderPC.getSenders().forEach(sender => {
+              if (sender.track) {
+                sender.track.stop();          // HARD stop camera
+                webRTCContainerRef.current.senderPC.removeTrack(sender); // DETACH sender
+              }
+            });
+          }
+
 
           // Close datachannel
-          if (webrtcContainer.current.dc) {
-            webrtcContainer.current.dc.close();
-            webrtcContainer.current.dc = null;
+          if (webRTCContainerRef.current.senderDC) {
+            webRTCContainerRef.current.senderDC.close();
+            webRTCContainerRef.current.senderDC = null;
           }
 
           // Close peer connection
-          webrtcContainer.current.pc.close();
-          webrtcContainer.current.pc = null;
+          webRTCContainerRef.current.senderPC.close();
+          webRTCContainerRef.current.senderPC = null;
+
+          if(webRTCContainerRef.current.streamElementAtSender && webRTCContainerRef.current.streamElementAtSender.parentNode){
+            webRTCContainerRef.current.streamElementAtSender.remove()
+          }
+          webRTCContainerRef.current.streamElementAtSender = null
+
+
+          
+
+
+          webRTCContainerRef.current.senderPC = null;
 
           // Reset button
+          rtcbuttonRef.current.onclick = ()=> {webRTCContainerRef.current.webRTCStartFunction("mediastream")};
           rtcbuttonRef.current.style.backgroundColor = "transparent";
-          rtcbuttonRef.current.onclick = rtcStarterFunction.current;
         }
       };
 
@@ -299,7 +345,7 @@ function App() {
 
           socketContainer={socketContainer}
 
-          webrtcContainer={webrtcContainer}
+          webRTCContainerRef={webRTCContainerRef}
 
           rtcbuttonRef={rtcbuttonRef}
 

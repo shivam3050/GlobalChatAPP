@@ -302,52 +302,61 @@ export function Home(props) {
                         return
                     }
                     if (data.query === "offer") {
-                        4
+
                         try {
 
-                            // Create RTCPeerConnection
-                            const pc = new RTCPeerConnection();
-                            props.webrtcContainer.current.pc = pc;
+                            if (props.webRTCContainerRef.current.senderPC || props.webRTCContainerRef.current.senderPC) {
+                                console.error("sorry i cannot get your offer as i am having already a connection.")
+                                return;
+                            }
 
-                            props.webrtcContainer.current.pc.ontrack = (event) => {
+                            // Create RTCPeerConnection
+                            props.webRTCContainerRef.current.senderPC = new RTCPeerConnection();
+
+
+                            props.webRTCContainerRef.current.senderPC.ontrack = (event) => {
                                 // Check track state
                                 event.track.onmute = () => console.log("Track muted");
                                 event.track.onunmute = () => console.log("Track unmuted");
                                 // this got triggers only first time a track comes
-                                const tc = event.track;
-                                props.webrtcContainer.current.tc = tc; // a current coming track
+                                props.webRTCContainerRef.current.senderTC = event.track;
 
-                                const playingElement = document.createElement(event.track.kind);
-                                
-                                playingElement.style.zIndex = "20";
-                                playingElement.style.width = "200px"
-                                playingElement.style.height = "200px"
-                               
-                               
+                                if(props.webRTCContainerRef.current.streamElementAtReceiver && props.webRTCContainerRef.current.streamElementAtReceiver.parentNode){
+                                    props.webRTCContainerRef.current.streamElementAtReceiver.remove()
+                                }
 
-                                props.webrtcContainer.current.tc.playingElement = playingElement // adding reference of this element for accessing it at other times
 
-                                playingElement.srcObject = event.streams[0];
+                                props.webRTCContainerRef.current.streamElementAtReceiver = document.createElement(event.track.kind);
+
+                                props.webRTCContainerRef.current.streamElementAtReceiver.style.zIndex = "20";
+                                props.webRTCContainerRef.current.streamElementAtReceiver.style.width = "clamp(100px,80%,500px)"
+                                // playingElement.style.height = "200px"
+
+
+
+                                // adding reference of this element for accessing it at other times
+
+                                props.webRTCContainerRef.current.streamElementAtReceiver.srcObject = event.streams[0];
                                 // playingElement.muted = true; 
-                                playingElement.autoplay = true;
-                                playingElement.controls = true;
+                                props.webRTCContainerRef.current.streamElementAtReceiver.autoplay = true;
+                                props.webRTCContainerRef.current.streamElementAtReceiver.controls = true;
 
                                 // ADD THESE CHECKS:
-                                playingElement.oncanplay = () => {
+                                props.webRTCContainerRef.current.streamElementAtReceiver.oncanplay = () => {
                                     console.log("Audio can play - controls should be enabled");
                                 };
 
-                                playingElement.onplaying = () => {
+                                props.webRTCContainerRef.current.streamElementAtReceiver.onplaying = () => {
                                     console.log("Audio is actually playing");
                                 };
 
-                                playingElement.onerror = (e) => {
+                                props.webRTCContainerRef.current.streamElementAtReceiver.onerror = (e) => {
                                     console.error("Audio element error:", e);
                                 };
 
                                 // Force play if autoplay fails
                                 setTimeout(() => {
-                                    playingElement.play()
+                                    props.webRTCContainerRef.current.streamElementAtReceiver.play()
                                         .then(() => console.log("✅ Playback started"))
                                         .catch(err => console.error("Play failed:", err));
                                 }, 100);
@@ -357,24 +366,26 @@ export function Home(props) {
                                 // }
                                 // props.rtcbuttonRef.current.querySelector(".webrtcdivkeeper").appendChild(playingElement)
 
-                                
-                                const chatsDiv = document.getElementById("chats-div") // you need to focus chat
-                                if(chatsDiv){
-                                    if(chatsDiv.contains(playingElement)){
-                                        chatsDiv.removeChild(playingElement)
+
+                                props.webRTCContainerRef.current.streamElementParentAtReceiver = document.getElementById("chats-div") // you need to focus chat
+
+                                if (props.webRTCContainerRef.current.streamElementParentAtReceiver) {
+                                    if (props.webRTCContainerRef.current.streamElementParentAtReceiver.contains(props.webRTCContainerRef.current.streamElementAtReceiver)) {
+
+                                        props.webRTCContainerRef.current.streamElementParentAtReceiver.removeChild(props.webRTCContainerRef.current.streamElementAtReceiver)
                                     }
-                                    chatsDiv.appendChild(playingElement)
-                                    props.webrtcContainer.current.tc.whereItIsPlaced = chatsDiv
+
+                                    props.webRTCContainerRef.current.streamElementParentAtReceiver.appendChild(props.webRTCContainerRef.current.streamElementAtReceiver)
                                 }
 
                             }
 
                             // Listen for DataChannel from sender
-                            props.webrtcContainer.current.pc.ondatachannel = (event) => {
-                                const dc = event.channel;
-                                props.webrtcContainer.current.dc = dc;
+                            props.webRTCContainerRef.current.senderPC.ondatachannel = (event) => {
+                                props.webRTCContainerRef.current.senderDC = event.channel;
 
-                                props.webrtcContainer.current.dc.onopen = () => {
+
+                                props.webRTCContainerRef.current.senderDC.onopen = () => {
 
                                     console.log("Data channel open (receiver)");
 
@@ -382,20 +393,20 @@ export function Home(props) {
 
 
 
-                                    props.webrtcContainer.current.dc.send("Hello back Sir"); // optional initial message
+                                    props.webRTCContainerRef.current.senderDC.send("Hello back Sir"); // optional initial message
                                 };
 
-                                props.webrtcContainer.current.dc.onmessage = (e) => {
+                                props.webRTCContainerRef.current.senderDC.onmessage = (e) => {
                                     console.log("Message from sender:", e.data);
                                     alert(e.data)
                                 };
 
-                                props.webrtcContainer.current.dc.onerror = (err) => console.error("DataChannel error:", err);
+                                props.webRTCContainerRef.current.senderDC.onerror = (err) => console.error("DataChannel error:", err);
                             };
 
                             // Handle ICE candidates
-                            props.webrtcContainer.current.pc.onicecandidate = (e) => {
-                                console.log("ICE state:", props.webrtcContainer.current.pc.iceConnectionState);
+                            props.webRTCContainerRef.current.senderPC.onicecandidate = (e) => {
+                                console.log("ICE state:", props.webRTCContainerRef.current.senderPC.iceConnectionState);
 
                                 if (e.candidate) {
                                     try {
@@ -415,11 +426,11 @@ export function Home(props) {
                             };
 
                             // Set remote description (offer from sender)
-                            await props.webrtcContainer.current.pc.setRemoteDescription(data.d);
+                            await props.webRTCContainerRef.current.senderPC.setRemoteDescription(data.d);
 
                             // Create and send answer
-                            const answer = await props.webrtcContainer.current.pc.createAnswer();
-                            await props.webrtcContainer.current.pc.setLocalDescription(answer);
+                            const answer = await props.webRTCContainerRef.current.senderPC.createAnswer();
+                            await props.webRTCContainerRef.current.senderPC.setLocalDescription(answer);
 
                             // ANSWER WILL GO FIRST
                             props.socketContainer.current.send(
@@ -435,9 +446,9 @@ export function Home(props) {
                             );
 
                             // Handle connection state changes
-                            props.webrtcContainer.current.pc.onconnectionstatechange = () => {
+                            props.webRTCContainerRef.current.senderPC.onconnectionstatechange = () => {
 
-                                if (pc.connectionState === "connected") {
+                                if (props.webRTCContainerRef.current.senderPC.connectionState === "connected") {
                                     console.log("✅ Peer connection SUCCESS!");
                                     // Your code here when connection is successful
                                     props.rtcbuttonRef.current.style.backgroundColor = "red";
@@ -445,74 +456,81 @@ export function Home(props) {
                                         e.stopPropagation();
 
                                         // Close track
-                                        if (props.webrtcContainer.current.tc) {
-                                            props.webrtcContainer.current.tc.stop();
-                                            const playingElement = props.webrtcContainer.current.tc?.playingElement
-                                            if (playingElement) {
+                                        if (props.webRTCContainerRef.current.senderTC) {
+                                            props.webRTCContainerRef.current.senderTC.stop();
+
+                                            if (props.webRTCContainerRef.current.streamElementAtReceiver) {
                                                 // remove from dom .remove() and 
-                                                
-                                                if(props.webrtcContainer.current.tc?.whereItIsPlaced && props.webrtcContainer.current.tc?.whereItIsPlaced.contains(playingElement)){
-                                                    props.webrtcContainer.current.tc?.whereItIsPlaced.removeChild(playingElement)
+
+                                                if (props.webRTCContainerRef.current.streamElementParentAtReceiver && props.webRTCContainerRef.current.streamElementParentAtReceiver?.contains(props.webRTCContainerRef.current.streamElementAtReceiver)) {
+                                                    props.webRTCContainerRef.current.streamElementParentAtReceiver.removeChild(props.webRTCContainerRef.current.streamElementAtReceiver)
                                                 }
-                                                props.webrtcContainer.current.tc.playingElement = null
+                                                props.webRTCContainerRef.current.streamElementAtReceiver = null
                                             }
-                                            props.webrtcContainer.current.tc = null;
+                                            props.webRTCContainerRef.current.senderTC = null;
                                             console.log("tc closed")
                                         }
 
                                         // Close the data channel first
-                                        if (props.webrtcContainer.current.dc) {
-                                            props.webrtcContainer.current.dc.close();
+                                        if (props.webRTCContainerRef.current.senderDC) {
+                                            props.webRTCContainerRef.current.senderDC.close();
                                             console.log("data channel connection closed")
-                                            props.webrtcContainer.current.dc = null;
+                                            props.webRTCContainerRef.current.senderDC = null;
                                         }
 
                                         // Then close the peer connection
-                                        if (props.webrtcContainer.current.pc) {
-                                            props.webrtcContainer.current.pc.close();
+                                        if (props.webRTCContainerRef.current.senderPC) {
+                                            props.webRTCContainerRef.current.senderPC.close();
                                             console.log("full peer connection closed")
-                                            props.webrtcContainer.current.pc = null;
+                                            props.webRTCContainerRef.current.senderPC = null;
                                         }
 
-                                        props.rtcbuttonRef.current.onclick = props.rtcStarterFunction.current;
+                                        props.webRTCContainerRef.current.senderPC = null
+
+
+                                        props.rtcbuttonRef.current.onclick = ()=> {props.webRTCContainerRef.current.webRTCStartFunction("mediastream")};
                                         props.rtcbuttonRef.current.style.backgroundColor = "transparent";
                                     }
                                 }
-                                console.log("Connection state:", props.webrtcContainer.current.pc.connectionState);
+                                console.log("Connection state:", props.webRTCContainerRef.current.senderPC.connectionState);
 
                                 // Only cleanup if connection actually failed or closed
-                                if (props.webrtcContainer.current.pc && (props.webrtcContainer.current.pc.connectionState === "failed" || props.webrtcContainer.current.pc.connectionState === "closed")) {
+                                if (props.webRTCContainerRef.current.senderPC && (props.webRTCContainerRef.current.senderPC.connectionState === "failed" || props.webRTCContainerRef.current.senderPC.connectionState === "closed")) {
 
                                     console.log("Connection failed/closed, cleaning up");
 
                                     // Close datachannel
-                                    if (props.webrtcContainer.current.dc) {
-                                        props.webrtcContainer.current.dc.close();
-                                        props.webrtcContainer.current.dc = null;
+                                    if (props.webRTCContainerRef.current.senderDC) {
+                                        props.webRTCContainerRef.current.senderDC.close();
+                                        props.webRTCContainerRef.current.senderDC = null;
                                     }
 
                                     // Close track
-                                    if (props.webrtcContainer.current.tc) {
-                                        props.webrtcContainer.current.tc.stop();
-                                        const playingElement = props.webrtcContainer.current.tc?.playingElement
-                                        if (playingElement) {
+                                    if (props.webRTCContainerRef.current.senderTC) {
+                                        props.webRTCContainerRef.current.senderTC.stop();
+
+                                        if (props.webRTCContainerRef.current.streamElementAtReceiver) {
                                             // remove from dom .remove() and 
-                                            if (props.webrtcContainer.current.tc?.whereItIsPlaced &&  props.webrtcContainer.current.tc?.whereItIsPlaced.contains(playingElement)) {
-                                                props.webrtcContainer.current.tc?.whereItIsPlaced.removeChild(playingElement)
-                                            }
-                                            props.webrtcContainer.current.tc.playingElement = null
+                                            if (props.webRTCContainerRef.current.streamElementParentAtReceiver){
+                                                if(props.webRTCContainerRef.current.streamElementParentAtReceiver?.contains(props.webRTCContainerRef.current.streamElementAtReceiver)){
+                                                    props.webRTCContainerRef.current.streamElementParentAtReceiver.removeChild(props.webRTCContainerRef.current.streamElementAtReceiver)
+                                                }
+                                            } 
+                                            props.webRTCContainerRef.current.streamElementAtReceiver = null
                                         }
-                                        props.webrtcContainer.current.tc = null;
+                                        props.webRTCContainerRef.current.senderTC = null;
                                         console.log("finished track")
                                     }
 
                                     // Close peer connection
-                                    props.webrtcContainer.current.pc.close();
-                                    props.webrtcContainer.current.pc = null;
+                                    props.webRTCContainerRef.current.senderPC.close();
+                                    props.webRTCContainerRef.current.senderPC = null;
+
+                                    props.webRTCContainerRef.current.senderPC = null;
 
                                     // Reset button
                                     props.rtcbuttonRef.current.style.backgroundColor = "transparent";
-                                    props.rtcbuttonRef.current.onclick = props.rtcStarterFunction.current;
+                                    props.rtcbuttonRef.current.onclick = ()=> {props.webRTCContainerRef.current.webRTCStartFunction("mediastream")};
                                 }
                             };
                         } catch (err) {
@@ -521,14 +539,14 @@ export function Home(props) {
                         return
                     }
                     if (data.query === "ice") {
-                        const pc = props.webrtcContainer.current.pc;
-                        if (!pc) {
+
+                        if (!props.webRTCContainerRef.current.senderPC) {
                             console.error("No peer connection to add ICE candidate to");
                             return;
                         }
 
                         try {
-                            await pc.addIceCandidate(new RTCIceCandidate(data.d));
+                            await props.webRTCContainerRef.current.senderPC.addIceCandidate(new RTCIceCandidate(data.d));
                             console.log("ICE candidate added successfully");
                         } catch (err) {
                             console.error("Failed to add ICE candidate:", err);
@@ -536,11 +554,15 @@ export function Home(props) {
                         return
                     }
                     if (data.query === "answer") {
-                        const pc = props.webrtcContainer.current.pc;
-                        if (!pc) return;
+
+                        if (!props.webRTCContainerRef.current.senderPC) {
+                            console.error("cannot continue in this answer query.")
+                            return
+
+                        };
 
                         // Set the remote description so WebRTC can finalize the connection
-                        pc.setRemoteDescription(new RTCSessionDescription(data.d))
+                        props.webRTCContainerRef.current.senderPC.setRemoteDescription(new RTCSessionDescription(data.d))
                             .then(() => {
                                 console.log("Remote description (answer) applied, connection should complete");
                             })
@@ -2018,7 +2040,7 @@ export function Home(props) {
                     <section
                         className="button" ref={props.rtcbuttonRef}
                         style={{ display: selectedReceiver.username ? "flex" : "none" }}
-                        onClick={() => { props.rtcStarterFunction.current("mediastream") }}
+                        onClick={() => { props.webRTCContainerRef.current.webRTCStartFunction("mediastream") }}
                     >
                         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-telephone-plus-fill" viewBox="0 0 16 16">
                             <path fill-rule="evenodd" d="M1.885.511a1.745 1.745 0 0 1 2.61.163L6.29 2.98c.329.423.445.974.315 1.494l-.547 2.19a.68.68 0 0 0 .178.643l2.457 2.457a.68.68 0 0 0 .644.178l2.189-.547a1.75 1.75 0 0 1 1.494.315l2.306 1.794c.829.645.905 1.87.163 2.611l-1.034 1.034c-.74.74-1.846 1.065-2.877.702a18.6 18.6 0 0 1-7.01-4.42 18.6 18.6 0 0 1-4.42-7.009c-.362-1.03-.037-2.137.703-2.877zM12.5 1a.5.5 0 0 1 .5.5V3h1.5a.5.5 0 0 1 0 1H13v1.5a.5.5 0 0 1-1 0V4h-1.5a.5.5 0 0 1 0-1H12V1.5a.5.5 0 0 1 .5-.5" />
