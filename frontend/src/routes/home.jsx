@@ -302,10 +302,72 @@ export function Home(props) {
                         return
                     }
                     if (data.query === "offer") {
+                        4
                         try {
+
                             // Create RTCPeerConnection
                             const pc = new RTCPeerConnection();
                             props.webrtcContainer.current.pc = pc;
+
+                            props.webrtcContainer.current.pc.ontrack = (event) => {
+                                // Check track state
+                                event.track.onmute = () => console.log("Track muted");
+                                event.track.onunmute = () => console.log("Track unmuted");
+                                // this got triggers only first time a track comes
+                                const tc = event.track;
+                                props.webrtcContainer.current.tc = tc; // a current coming track
+
+                                const playingElement = document.createElement(event.track.kind);
+                                
+                                playingElement.style.zIndex = "20";
+                                playingElement.style.width = "200px"
+                                playingElement.style.height = "200px"
+                               
+                               
+
+                                props.webrtcContainer.current.tc.playingElement = playingElement // adding reference of this element for accessing it at other times
+
+                                playingElement.srcObject = event.streams[0];
+                                // playingElement.muted = true; 
+                                playingElement.autoplay = true;
+                                playingElement.controls = true;
+
+                                // ADD THESE CHECKS:
+                                playingElement.oncanplay = () => {
+                                    console.log("Audio can play - controls should be enabled");
+                                };
+
+                                playingElement.onplaying = () => {
+                                    console.log("Audio is actually playing");
+                                };
+
+                                playingElement.onerror = (e) => {
+                                    console.error("Audio element error:", e);
+                                };
+
+                                // Force play if autoplay fails
+                                setTimeout(() => {
+                                    playingElement.play()
+                                        .then(() => console.log("✅ Playback started"))
+                                        .catch(err => console.error("Play failed:", err));
+                                }, 100);
+                                // attach to document
+                                // if (props.rtcbuttonRef.current.querySelector(".webrtcdivkeeper").contains(playingElement)) {
+                                //     props.rtcbuttonRef.current.querySelector(".webrtcdivkeeper").removeChild(playingElement)
+                                // }
+                                // props.rtcbuttonRef.current.querySelector(".webrtcdivkeeper").appendChild(playingElement)
+
+                                
+                                const chatsDiv = document.getElementById("chats-div") // you need to focus chat
+                                if(chatsDiv){
+                                    if(chatsDiv.contains(playingElement)){
+                                        chatsDiv.removeChild(playingElement)
+                                    }
+                                    chatsDiv.appendChild(playingElement)
+                                    props.webrtcContainer.current.tc.whereItIsPlaced = chatsDiv
+                                }
+
+                            }
 
                             // Listen for DataChannel from sender
                             props.webrtcContainer.current.pc.ondatachannel = (event) => {
@@ -316,27 +378,9 @@ export function Home(props) {
 
                                     console.log("Data channel open (receiver)");
 
-                                    props.rtcbuttonRef.current.style.backgroundColor = "red";
 
-                                    props.rtcbuttonRef.current.onclick = (e) => {
-                                        e.stopPropagation();
-                                        // Close the data channel first
-                                        if (props.webrtcContainer.current.dc) {
-                                            props.webrtcContainer.current.dc.close();
-                                            console.log("data channel connection closed")
-                                            props.webrtcContainer.current.dc = null;
-                                        }
 
-                                        // Then close the peer connection
-                                        if (props.webrtcContainer.current.pc) {
-                                            props.webrtcContainer.current.pc.close();
-                                            console.log("full peer connection closed")
-                                            props.webrtcContainer.current.pc = null;
-                                        }
 
-                                        props.rtcbuttonRef.current.onclick = props.rtcStarterFunction.current;
-                                        props.rtcbuttonRef.current.style.backgroundColor = "transparent";
-                                    }
 
                                     props.webrtcContainer.current.dc.send("Hello back Sir"); // optional initial message
                                 };
@@ -351,6 +395,8 @@ export function Home(props) {
 
                             // Handle ICE candidates
                             props.webrtcContainer.current.pc.onicecandidate = (e) => {
+                                console.log("ICE state:", props.webrtcContainer.current.pc.iceConnectionState);
+
                                 if (e.candidate) {
                                     try {
                                         props.socketContainer.current.send(
@@ -390,10 +436,52 @@ export function Home(props) {
 
                             // Handle connection state changes
                             props.webrtcContainer.current.pc.onconnectionstatechange = () => {
+
+                                if (pc.connectionState === "connected") {
+                                    console.log("✅ Peer connection SUCCESS!");
+                                    // Your code here when connection is successful
+                                    props.rtcbuttonRef.current.style.backgroundColor = "red";
+                                    props.rtcbuttonRef.current.onclick = (e) => {
+                                        e.stopPropagation();
+
+                                        // Close track
+                                        if (props.webrtcContainer.current.tc) {
+                                            props.webrtcContainer.current.tc.stop();
+                                            const playingElement = props.webrtcContainer.current.tc?.playingElement
+                                            if (playingElement) {
+                                                // remove from dom .remove() and 
+                                                
+                                                if(props.webrtcContainer.current.tc?.whereItIsPlaced && props.webrtcContainer.current.tc?.whereItIsPlaced.contains(playingElement)){
+                                                    props.webrtcContainer.current.tc?.whereItIsPlaced.removeChild(playingElement)
+                                                }
+                                                props.webrtcContainer.current.tc.playingElement = null
+                                            }
+                                            props.webrtcContainer.current.tc = null;
+                                            console.log("tc closed")
+                                        }
+
+                                        // Close the data channel first
+                                        if (props.webrtcContainer.current.dc) {
+                                            props.webrtcContainer.current.dc.close();
+                                            console.log("data channel connection closed")
+                                            props.webrtcContainer.current.dc = null;
+                                        }
+
+                                        // Then close the peer connection
+                                        if (props.webrtcContainer.current.pc) {
+                                            props.webrtcContainer.current.pc.close();
+                                            console.log("full peer connection closed")
+                                            props.webrtcContainer.current.pc = null;
+                                        }
+
+                                        props.rtcbuttonRef.current.onclick = props.rtcStarterFunction.current;
+                                        props.rtcbuttonRef.current.style.backgroundColor = "transparent";
+                                    }
+                                }
+                                console.log("Connection state:", props.webrtcContainer.current.pc.connectionState);
+
                                 // Only cleanup if connection actually failed or closed
-                                if (props.webrtcContainer.current.pc &&
-                                    (props.webrtcContainer.current.pc.connectionState === "failed" ||
-                                        props.webrtcContainer.current.pc.connectionState === "closed")) {
+                                if (props.webrtcContainer.current.pc && (props.webrtcContainer.current.pc.connectionState === "failed" || props.webrtcContainer.current.pc.connectionState === "closed")) {
 
                                     console.log("Connection failed/closed, cleaning up");
 
@@ -401,6 +489,21 @@ export function Home(props) {
                                     if (props.webrtcContainer.current.dc) {
                                         props.webrtcContainer.current.dc.close();
                                         props.webrtcContainer.current.dc = null;
+                                    }
+
+                                    // Close track
+                                    if (props.webrtcContainer.current.tc) {
+                                        props.webrtcContainer.current.tc.stop();
+                                        const playingElement = props.webrtcContainer.current.tc?.playingElement
+                                        if (playingElement) {
+                                            // remove from dom .remove() and 
+                                            if (props.webrtcContainer.current.tc?.whereItIsPlaced &&  props.webrtcContainer.current.tc?.whereItIsPlaced.contains(playingElement)) {
+                                                props.webrtcContainer.current.tc?.whereItIsPlaced.removeChild(playingElement)
+                                            }
+                                            props.webrtcContainer.current.tc.playingElement = null
+                                        }
+                                        props.webrtcContainer.current.tc = null;
+                                        console.log("finished track")
                                     }
 
                                     // Close peer connection
@@ -1094,60 +1197,6 @@ export function Home(props) {
                 }
 
 
-
-                // if (data.type === "file-meta-data-response-from-server") { // this is succes and saying send the raw file , permission gained
-
-                //     if (data.status === "failed") {// this is failed for file upload
-                //         console.error("you cannot upload file", data.msg)
-
-                //         const chatsDiv = props.chatsDivRef.current
-
-
-                //         const pendinGlobetFields = chatsDiv.querySelectorAll(".newly-unupdated-chats")
-
-                //         for (let i = 0; i < pendinGlobetFields.length; i++) {
-
-                //             pendinGlobetFields[i].children[1].textContent = `❌`
-
-                //             pendinGlobetFields[i].classList.remove("newly-unupdated-chats")
-                //         }
-                //         // alert("file not uploaded");
-                //         console.log("file not uploaded")
-                //         return;
-                //     }
-
-
-                //     const file = props.chatRef.current.filesToBeSent[data.upcomingFilename];
-
-
-                //     if (!file) {
-                //         console.error("no file present to send");
-                //         return;
-                //     }
-
-                //     const chunkSize = 64 * 1024; // 64 KB
-                //     let offset = 0;
-
-                //     function sendChunk() {
-                //         if (offset >= file.size) return;
-
-                //         const slice = file.slice(offset, offset + chunkSize);
-                //         const reader = new FileReader();
-
-                //         reader.onload = () => {
-
-                //             props.socketContainer.current.send(reader.result); // send binary
-                //             offset += chunkSize;
-                //             sendChunk(); // send next chunk
-                //         };
-
-                //         reader.readAsArrayBuffer(slice);
-                //     }
-                //     sendChunk();
-
-                //     return;
-
-                // }
                 if (data.type === "file-completed-response-from-server") { // this is saying file is received completely
                     if (data.sender.id === userRef.current.id) {
                         // you was the sender yourself
@@ -1962,14 +2011,20 @@ export function Home(props) {
 
                     </section>
 
+
+
+                    {/* below is call button for rtc */}
+
                     <section
                         className="button" ref={props.rtcbuttonRef}
                         style={{ display: selectedReceiver.username ? "flex" : "none" }}
-                        onClick={props.rtcStarterFunction.current}
+                        onClick={() => { props.rtcStarterFunction.current("mediastream") }}
                     >
                         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-telephone-plus-fill" viewBox="0 0 16 16">
                             <path fill-rule="evenodd" d="M1.885.511a1.745 1.745 0 0 1 2.61.163L6.29 2.98c.329.423.445.974.315 1.494l-.547 2.19a.68.68 0 0 0 .178.643l2.457 2.457a.68.68 0 0 0 .644.178l2.189-.547a1.75 1.75 0 0 1 1.494.315l2.306 1.794c.829.645.905 1.87.163 2.611l-1.034 1.034c-.74.74-1.846 1.065-2.877.702a18.6 18.6 0 0 1-7.01-4.42 18.6 18.6 0 0 1-4.42-7.009c-.362-1.03-.037-2.137.703-2.877zM12.5 1a.5.5 0 0 1 .5.5V3h1.5a.5.5 0 0 1 0 1H13v1.5a.5.5 0 0 1-1 0V4h-1.5a.5.5 0 0 1 0-1H12V1.5a.5.5 0 0 1 .5-.5" />
                         </svg>
+                        <div className="webrtcdivkeeper"></div>
+
                     </section>
 
                 </header>

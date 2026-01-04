@@ -105,7 +105,7 @@ function App() {
 
   }, [])
 
-  rtcStarterFunction.current = async () => {
+  rtcStarterFunction.current = async (motive = null) => {
     try {
       // Check WebSocket is ready
       if (!socketContainer.current || socketContainer.current.readyState !== 1) {
@@ -115,39 +115,45 @@ function App() {
 
       const pc = new RTCPeerConnection();
       webrtcContainer.current.pc = pc;
-      const dc = pc.createDataChannel("text");
-      webrtcContainer.current.dc = dc;
+      let dc = null;
+      if (motive === "text") {
+        dc = pc.createDataChannel("text")
+      } else if (motive === "binary") {
+        dc = pc.createDataChannel("binary")
+      } else if (motive === "json") {
+        dc = pc.createDataChannel("json")
+      } else if (motive === "mediastream") {
 
-      webrtcContainer.current.dc.onopen = () => {
-        console.log("Data channel open");
-        webrtcContainer.current.dc.send("Hello Sir");
-        rtcbuttonRef.current.style.backgroundColor = "red";
-        rtcbuttonRef.current.onclick = (e) => {
-          e.stopPropagation();
-          // Close the data channel first
-          if (webrtcContainer.current.dc) {
-            webrtcContainer.current.dc.close();
-            console.log("data channel closed")
-            webrtcContainer.current.dc = null;
-          }
+        const aStream = await navigator.mediaDevices.getUserMedia({ video: true });
+        const audioTrack = aStream.getTracks()[0]
+        webrtcContainer.current.localStream = audioTrack; // currently only one track i am using // storing for reference when time to stop camera
+        pc.addTrack(audioTrack, aStream)
 
-          // Then close the peer connection
-          if (webrtcContainer.current.pc) {
-            webrtcContainer.current.pc.close();
-            console.log("full connection closed")
-            webrtcContainer.current.pc = null;
-          }
-          rtcbuttonRef.current.onclick = rtcStarterFunction;
-          rtcbuttonRef.current.style.backgroundColor = "transparent";
+      } else {
+        dc = pc.createDataChannel("text")
+        console.log("no motive provided for rtc, assuming default text motive and creating data channel")
+      }
 
-        }
-      };
-      webrtcContainer.current.dc.onmessage = (e) => {
-        console.log("Message from receiver:", e.data);
-        alert(e.data)
-      };
+      if (!dc) {
+        // pass
+      } else {
 
-      dc.onerror = (err) => console.error("Data channel error:", err);
+        webrtcContainer.current.dc = dc;
+
+        webrtcContainer.current.dc.onopen = () => {
+          console.log("Data channel open");
+          webrtcContainer.current.dc.send("Hello Sir");
+
+        };
+        webrtcContainer.current.dc.onmessage = (e) => {
+          console.log("Message from receiver:", e.data);
+          alert(e.data)
+        };
+
+        dc.onerror = (err) => console.error("Data channel error:", err);
+
+      }
+
 
 
 
@@ -194,32 +200,93 @@ function App() {
 
       // Cleanup on connection close
       webrtcContainer.current.pc.onconnectionstatechange = () => {
-        // Only cleanup if connection actually failed or closed
-      if (webrtcContainer.current.pc && 
-          (webrtcContainer.current.pc.connectionState === "failed" ||
-           webrtcContainer.current.pc.connectionState === "closed")) {
-        
-        console.log("Connection failed/closed, cleaning up");
-        
-        // Close datachannel
-        if (webrtcContainer.current.dc) {
-          webrtcContainer.current.dc.close();
-          webrtcContainer.current.dc = null;
+
+        if (webrtcContainer.current.pc.connectionState === "connected") {
+          rtcbuttonRef.current.style.backgroundColor = "red";
+          rtcbuttonRef.current.onclick = (e) => {
+
+            e.stopPropagation();
+
+            // 1️⃣ STOP all sender tracks
+            if (webrtcContainer.current.pc) {
+              webrtcContainer.current.pc.getSenders().forEach(sender => {
+                if (sender.track) {
+                  sender.track.stop();          // HARD stop camera
+                  webrtcContainer.current.pc.removeTrack(sender); // DETACH sender
+                }
+              });
+            }
+
+            // Close track
+            if (webrtcContainer.current.tc) {
+              webrtcContainer.current.tc.stop();
+              const playingElement = webrtcContainer.current.tc?.playingElement
+              if (playingElement) {
+                // remove from dom .remove() and 
+                if (rtcbuttonRef.current.contains(playingElement)) {
+                  rtcbuttonRef.current.removeChild(playingElement)
+                }
+                webrtcContainer.current.tc.playingElement = null
+              }
+              if (webrtcContainer.current.localStream) {
+                webrtcContainer.current.localStream.stop()
+              }
+              webrtcContainer.current.tc = null;
+              console.log("tc closed")
+            }
+
+            // Close the data channel first
+            if (webrtcContainer.current.dc) {
+              webrtcContainer.current.dc.close();
+              console.log("data channel closed")
+              webrtcContainer.current.dc = null;
+            }
+
+            // Then close the peer connection
+            if (webrtcContainer.current.pc) {
+              webrtcContainer.current.pc.close();
+              console.log("full connection closed")
+              webrtcContainer.current.pc = null;
+            }
+            rtcbuttonRef.current.onclick = rtcStarterFunction;
+            rtcbuttonRef.current.style.backgroundColor = "transparent";
+
+          }
         }
-        
-        // Close peer connection
-        webrtcContainer.current.pc.close();
-        webrtcContainer.current.pc = null;
-        
-        // Reset button
-        rtcbuttonRef.current.style.backgroundColor = "transparent";
-        rtcbuttonRef.current.onclick = rtcStarterFunction.current;
-      }
+        // Only cleanup if connection actually failed or closed
+        if (webrtcContainer.current.pc && (webrtcContainer.current.pc.connectionState === "failed" || webrtcContainer.current.pc.connectionState === "closed")) {
+
+          console.log("Connection failed/closed, cleaning up");
+
+          // 1️⃣ STOP all sender tracks
+            if (webrtcContainer.current.pc) {
+              webrtcContainer.current.pc.getSenders().forEach(sender => {
+                if (sender.track) {
+                  sender.track.stop();          // HARD stop camera
+                  webrtcContainer.current.pc.removeTrack(sender); // DETACH sender
+                }
+              });
+            }
+
+          // Close datachannel
+          if (webrtcContainer.current.dc) {
+            webrtcContainer.current.dc.close();
+            webrtcContainer.current.dc = null;
+          }
+
+          // Close peer connection
+          webrtcContainer.current.pc.close();
+          webrtcContainer.current.pc = null;
+
+          // Reset button
+          rtcbuttonRef.current.style.backgroundColor = "transparent";
+          rtcbuttonRef.current.onclick = rtcStarterFunction.current;
+        }
       };
 
     } catch (err) {
       console.error("WebRTC setup failed:", err);
-      
+
     }
   }
 
