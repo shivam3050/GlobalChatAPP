@@ -232,7 +232,7 @@ export const ChatSection = (props) => {
   return <div id="chats-div" ref={props.chatsDivRef}>
     {
       availableChatsInUI.map((item, index) => {   //  senderId: data.sender.id, receiverId: data.receiver.id, content: data.msg, createdAt: data.createdAt
-        const originalTimestamp = new Date(item.createdAt)
+        const originalTimestamp = new Date(Number(item.createdAt))
         const createdAt = originalTimestamp.toLocaleTimeString(
           "en", {
           hour: "2-digit",
@@ -255,19 +255,64 @@ export const ChatSection = (props) => {
             {
               (item.senderId === props.userRef.current.id || item.senderId !== props.userRef.current.yourGlobalStarAiReference.id) ? (
                 <>
-                  <p className={`main-chat-text pre ${item.isLink ? "isLink" : ""}`} onClick={(item.isLink) ? (() => {
-                    if (props.socketContainer.current.isStillDownloading) {
-                      console.error("wait a file is already downloading")
-                      return
-                    }
-                    props.socketContainer.current.send(JSON.stringify(
-                      {
-                        type: "download-file-request-from-client",
-                        sender: item.senderId,
-                        receiver: item.receiverId,
-                        fileMetaDataInfo: { upcomingFilename: item.content, fileSize: item.fileSize }
-                      }
-                    ))
+                  <p className={`main-chat-text pre ${item.isLink ? "isLink" : ""}`} onClick={(item.isLink) ? (async() => {
+                    // if (props.socketContainer.current.isStillDownloading) {
+                    //   console.error("wait a file is already downloading")
+                    //   return
+                    // }
+                    const response = await fetch(`${import.meta.env.VITE_BACKEND_URL}/download-file`, {
+                                    method: "POST",
+                                    headers: {
+
+
+                                        "X-Modified-Filename": item.content,
+                                        "X-Custom-Access-Token": props.userRef.current.customAccessToken,
+                                        "X-Sender-Id": item.senderId,
+                                        "X-Receiver-Id": item.receiverId,
+                                        "X-Created-At": createdAt
+
+                                    }
+                                })
+
+                                if (!response.ok) {
+                                    const msg = await response.text();
+                                    console.log(msg)
+                                    return
+                                }
+
+                                try {
+                                    // Ask user where to save file
+                                    const handle = await window.showSaveFilePicker({
+                                        suggestedName: shortFilename(item.content)
+                                        //types: [{ description: 'ZIP files', accept: { 'application/zip': ['.zip'] } }]
+                                    });
+
+                                    const writable = await handle.createWritable();
+
+                                    const reader = response.body.getReader();
+
+         
+
+                                    while (true) {
+                                        const { done, value } = await reader.read();
+                                        if (done) break;
+                                        await writable.write(value);
+                                    }
+
+                                    await writable.close();
+                                    alert("Download complete!");
+                                } catch (err) {
+                                    console.error("Download failed:", err);
+                                    alert("Download failed: " + err.message);
+                                }
+                    // props.socketContainer.current.send(JSON.stringify(
+                    //   {
+                    //     type: "download-file-request-from-client",
+                    //     sender: item.senderId,
+                    //     receiver: item.receiverId,
+                    //     fileMetaDataInfo: { upcomingFilename: item.content, fileSize: item.fileSize }
+                    //   }
+                    // ))
 
                   }) : (null)}>
                     {item.isLink ? (<><span> {shortFilename(item.content)}</span> <br></br>

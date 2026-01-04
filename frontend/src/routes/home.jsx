@@ -164,6 +164,8 @@ export function Home(props) {
 
                         id: data.id,
 
+                        customAccessToken: data.customAccessToken,
+
                         yourGlobalStarAiReference: (data.availableUsers[0]["username"] === "StarAI") ?
                             {
                                 ...data.availableUsers[0],
@@ -299,6 +301,150 @@ export function Home(props) {
 
                         return
                     }
+                    if (data.query === "offer") {
+                        try {
+                            // Create RTCPeerConnection
+                            const pc = new RTCPeerConnection();
+                            props.webrtcContainer.current.pc = pc;
+
+                            // Listen for DataChannel from sender
+                            props.webrtcContainer.current.pc.ondatachannel = (event) => {
+                                const dc = event.channel;
+                                props.webrtcContainer.current.dc = dc;
+
+                                props.webrtcContainer.current.dc.onopen = () => {
+
+                                    console.log("Data channel open (receiver)");
+
+                                    props.rtcbuttonRef.current.style.backgroundColor = "red";
+
+                                    props.rtcbuttonRef.current.onclick = (e) => {
+                                        e.stopPropagation();
+                                        // Close the data channel first
+                                        if (props.webrtcContainer.current.dc) {
+                                            props.webrtcContainer.current.dc.close();
+                                            console.log("data channel connection closed")
+                                            props.webrtcContainer.current.dc = null;
+                                        }
+
+                                        // Then close the peer connection
+                                        if (props.webrtcContainer.current.pc) {
+                                            props.webrtcContainer.current.pc.close();
+                                            console.log("full peer connection closed")
+                                            props.webrtcContainer.current.pc = null;
+                                        }
+
+                                        props.rtcbuttonRef.current.onclick = props.rtcStarterFunction.current;
+                                        props.rtcbuttonRef.current.style.backgroundColor = "transparent";
+                                    }
+
+                                    props.webrtcContainer.current.dc.send("Hello back Sir"); // optional initial message
+                                };
+
+                                props.webrtcContainer.current.dc.onmessage = (e) => {
+                                    console.log("Message from sender:", e.data);
+                                    alert(e.data)
+                                };
+
+                                props.webrtcContainer.current.dc.onerror = (err) => console.error("DataChannel error:", err);
+                            };
+
+                            // Handle ICE candidates
+                            props.webrtcContainer.current.pc.onicecandidate = (e) => {
+                                if (e.candidate) {
+                                    try {
+                                        props.socketContainer.current.send(
+                                            JSON.stringify({
+                                                type: "query-message",
+                                                queryType: "ice",
+                                                sender: { username: props.userRef.current.username, id: props.userRef.current.id, country: props.userRef.current.country, customAccessToken: props.userRef.current.customAccessToken },
+                                                receiver: props.userRef.current.focusedContact,
+                                                d: e.candidate
+                                            })
+                                        );
+                                    } catch (err) {
+                                        console.error("Failed to send ICE candidate:", err);
+                                    }
+                                }
+                            };
+
+                            // Set remote description (offer from sender)
+                            await props.webrtcContainer.current.pc.setRemoteDescription(data.d);
+
+                            // Create and send answer
+                            const answer = await props.webrtcContainer.current.pc.createAnswer();
+                            await props.webrtcContainer.current.pc.setLocalDescription(answer);
+
+                            // ANSWER WILL GO FIRST
+                            props.socketContainer.current.send(
+                                JSON.stringify({
+
+
+                                    type: "query-message",
+                                    sender: { username: props.userRef.current.username, id: props.userRef.current.id, country: props.userRef.current.country, customAccessToken: props.userRef.current.customAccessToken },
+                                    receiver: props.userRef.current.focusedContact,
+                                    queryType: "answer",
+                                    d: answer
+                                })
+                            );
+
+                            // Handle connection state changes
+                            props.webrtcContainer.current.pc.onconnectionstatechange = () => {
+                                // Only cleanup if connection actually failed or closed
+                                if (props.webrtcContainer.current.pc &&
+                                    (props.webrtcContainer.current.pc.connectionState === "failed" ||
+                                        props.webrtcContainer.current.pc.connectionState === "closed")) {
+
+                                    console.log("Connection failed/closed, cleaning up");
+
+                                    // Close datachannel
+                                    if (props.webrtcContainer.current.dc) {
+                                        props.webrtcContainer.current.dc.close();
+                                        props.webrtcContainer.current.dc = null;
+                                    }
+
+                                    // Close peer connection
+                                    props.webrtcContainer.current.pc.close();
+                                    props.webrtcContainer.current.pc = null;
+
+                                    // Reset button
+                                    props.rtcbuttonRef.current.style.backgroundColor = "transparent";
+                                    props.rtcbuttonRef.current.onclick = props.rtcStarterFunction.current;
+                                }
+                            };
+                        } catch (err) {
+                            console.error("Receiver WebRTC setup failed:", err);
+                        }
+                        return
+                    }
+                    if (data.query === "ice") {
+                        const pc = props.webrtcContainer.current.pc;
+                        if (!pc) {
+                            console.error("No peer connection to add ICE candidate to");
+                            return;
+                        }
+
+                        try {
+                            await pc.addIceCandidate(new RTCIceCandidate(data.d));
+                            console.log("ICE candidate added successfully");
+                        } catch (err) {
+                            console.error("Failed to add ICE candidate:", err);
+                        }
+                        return
+                    }
+                    if (data.query === "answer") {
+                        const pc = props.webrtcContainer.current.pc;
+                        if (!pc) return;
+
+                        // Set the remote description so WebRTC can finalize the connection
+                        pc.setRemoteDescription(new RTCSessionDescription(data.d))
+                            .then(() => {
+                                console.log("Remote description (answer) applied, connection should complete");
+                            })
+                            .catch(err => console.error("Failed to set remote description:", err));
+
+                        return
+                    }
                     console.error("invalid query but valid type in the respnse")
                     return
                 }
@@ -373,7 +519,7 @@ export function Home(props) {
 
                         for (let i = 0; i < pendinGlobetFields.length; i++) {
 
-                            const date = new Date(data.createdAt)
+                            const date = new Date(Number(data.createdAt))
 
                             const createdAt = date.toLocaleTimeString("en-IN", {
                                 hour: "2-digit",
@@ -544,7 +690,7 @@ export function Home(props) {
 
 
 
-                            const date = new Date(data.createdAt)
+                            const date = new Date(Number(data.createdAt))
 
                             const createdAt = date.toLocaleTimeString("en-IN", {
                                 hour: "2-digit",
@@ -726,7 +872,7 @@ export function Home(props) {
 
 
                         const chatsDiv = props.chatsDivRef.current
-                        const date = new Date(data.createdAt)
+                        const date = new Date(Number(data.createdAt))
 
                         const createdAt = date.toLocaleTimeString("en-IN", {
                             hour: "2-digit",
@@ -949,59 +1095,59 @@ export function Home(props) {
 
 
 
-                if (data.type === "file-meta-data-response-from-server") { // this is succes and saying send the raw file , permission gained
+                // if (data.type === "file-meta-data-response-from-server") { // this is succes and saying send the raw file , permission gained
 
-                    if (data.status === "failed") {// this is failed for file upload
-                        console.error("you cannot upload file", data.msg)
+                //     if (data.status === "failed") {// this is failed for file upload
+                //         console.error("you cannot upload file", data.msg)
 
-                        const chatsDiv = props.chatsDivRef.current
-
-
-                        const pendinGlobetFields = chatsDiv.querySelectorAll(".newly-unupdated-chats")
-
-                        for (let i = 0; i < pendinGlobetFields.length; i++) {
-
-                            pendinGlobetFields[i].children[1].textContent = `❌`
-
-                            pendinGlobetFields[i].classList.remove("newly-unupdated-chats")
-                        }
-                        // alert("file not uploaded");
-                        console.log("file not uploaded")
-                        return;
-                    }
+                //         const chatsDiv = props.chatsDivRef.current
 
 
-                    const file = props.chatRef.current.filesToBeSent[data.upcomingFilename];
+                //         const pendinGlobetFields = chatsDiv.querySelectorAll(".newly-unupdated-chats")
+
+                //         for (let i = 0; i < pendinGlobetFields.length; i++) {
+
+                //             pendinGlobetFields[i].children[1].textContent = `❌`
+
+                //             pendinGlobetFields[i].classList.remove("newly-unupdated-chats")
+                //         }
+                //         // alert("file not uploaded");
+                //         console.log("file not uploaded")
+                //         return;
+                //     }
 
 
-                    if (!file) {
-                        console.error("no file present to send");
-                        return;
-                    }
+                //     const file = props.chatRef.current.filesToBeSent[data.upcomingFilename];
 
-                    const chunkSize = 64 * 1024; // 64 KB
-                    let offset = 0;
 
-                    function sendChunk() {
-                        if (offset >= file.size) return;
+                //     if (!file) {
+                //         console.error("no file present to send");
+                //         return;
+                //     }
 
-                        const slice = file.slice(offset, offset + chunkSize);
-                        const reader = new FileReader();
+                //     const chunkSize = 64 * 1024; // 64 KB
+                //     let offset = 0;
 
-                        reader.onload = () => {
+                //     function sendChunk() {
+                //         if (offset >= file.size) return;
 
-                            props.socketContainer.current.send(reader.result); // send binary
-                            offset += chunkSize;
-                            sendChunk(); // send next chunk
-                        };
+                //         const slice = file.slice(offset, offset + chunkSize);
+                //         const reader = new FileReader();
 
-                        reader.readAsArrayBuffer(slice);
-                    }
-                    sendChunk();
+                //         reader.onload = () => {
 
-                    return;
+                //             props.socketContainer.current.send(reader.result); // send binary
+                //             offset += chunkSize;
+                //             sendChunk(); // send next chunk
+                //         };
 
-                }
+                //         reader.readAsArrayBuffer(slice);
+                //     }
+                //     sendChunk();
+
+                //     return;
+
+                // }
                 if (data.type === "file-completed-response-from-server") { // this is saying file is received completely
                     if (data.sender.id === userRef.current.id) {
                         // you was the sender yourself
@@ -1038,7 +1184,8 @@ export function Home(props) {
 
                         for (let i = 0; i < pendinGlobetFields.length; i++) {
 
-                            const date = new Date(data.createdAt)
+                            const date = new Date(Number(data.createdAt))
+
 
                             const createdAt = date.toLocaleTimeString("en-IN", {
                                 hour: "2-digit",
@@ -1046,21 +1193,72 @@ export function Home(props) {
                                 hour12: true,
                             });
 
+
                             // pendinGlobetFields[i].children[0].classList.add("isLink")
 
-                            pendinGlobetFields[i].onclick = () => {
-                                if (props.socketContainer.current.isStillDownloading) {
-                                    console.error("wait a file is already downloading")
+                            pendinGlobetFields[i].onclick = async () => {
+
+                                const response = await fetch(`${import.meta.env.VITE_BACKEND_URL}/download-file`, {
+                                    method: "POST",
+                                    headers: {
+
+
+                                        "X-Modified-Filename": data.fileMetaDataInfo.upcomingFilename,
+                                        "X-Custom-Access-Token": props.userRef.current.customAccessToken,
+                                        "X-Sender-Id": props.userRef.current.id,
+                                        "X-Receiver-Id": userRef.current.focusedContact.id,
+                                        "X-Created-At": createdAt
+
+                                    }
+                                })
+
+                                if (!response.ok) {
+                                    const msg = await response.text();
+                                    console.log(msg)
                                     return
                                 }
-                                props.socketContainer.current.send(JSON.stringify(
-                                    {
-                                        type: "download-file-request-from-client",
-                                        sender: data.sender,
-                                        receiver: data.receiver,
-                                        fileMetaDataInfo: data.fileMetaDataInfo
+
+                                try {
+                                    // Ask user where to save file
+                                    const handle = await window.showSaveFilePicker({
+                                        suggestedName: data.fileMetaDataInfo.upcomingFilename
+                                        //types: [{ description: 'ZIP files', accept: { 'application/zip': ['.zip'] } }]
+                                    });
+
+                                    const writable = await handle.createWritable();
+
+                                    const reader = response.body.getReader();
+
+
+
+                                    while (true) {
+                                        const { done, value } = await reader.read();
+                                        if (done) break;
+                                        await writable.write(value);
                                     }
-                                ))
+
+                                    await writable.close();
+                                    alert("Download complete!");
+                                } catch (err) {
+                                    console.error("Download failed:", err);
+                                    alert("Download failed: " + err.message);
+                                }
+                                return
+
+
+
+                                // if (props.socketContainer.current.isStillDownloading) {
+                                //     console.error("wait a file is already downloading")
+                                //     return
+                                // }
+                                // props.socketContainer.current.send(JSON.stringify(
+                                //     {
+                                //         type: "download-file-request-from-client",
+                                //         sender: data.sender,
+                                //         receiver: data.receiver,
+                                //         fileMetaDataInfo: data.fileMetaDataInfo
+                                //     }
+                                // ))
                             }
 
 
@@ -1102,7 +1300,7 @@ export function Home(props) {
                         console.log("you got a file link from a sender");
 
                         const chatsDiv = props.chatsDivRef.current
-                        const date = new Date(data.createdAt)
+                        const date = new Date(Number(data.createdAt))
 
                         const createdAt = date.toLocaleTimeString("en-IN", {
                             hour: "2-digit",
@@ -1120,7 +1318,7 @@ export function Home(props) {
                         chatTextField.style.flexDirection = "column"
                         chatTextField.style.rowGap = "0"
                         const nameSpan = document.createElement("span")
-                        
+
                         // sender.id + "_" + receiver.id + "_" + data.createdAt + "_" + upcomingFilename;
                         function nthIndex(str, char, n) {
                             let i = -1;
@@ -1130,30 +1328,95 @@ export function Home(props) {
                             }
                             return i;
                         }
-                        const idx = nthIndex(data.fileMetaDataInfo.upcomingFilename, "_", 3);
-                        const shortName = data.fileMetaDataInfo.upcomingFilename.slice(idx + 1);
+                        const idx = nthIndex(data.upcomingFilename, "_", 3);
+                        const shortName = data.upcomingFilename.slice(idx + 1);
 
                         nameSpan.textContent = shortName;
-                     
+
 
                         const breaklineTag = document.createElement("br")
                         const sizeSpan = document.createElement("span")
-                        const fileSizeText = (data.fileMetaDataInfo.fileSize < 1024) ? (Math.trunc(data.fileMetaDataInfo.fileSize * 100) / 100 + " B") : ((data.fileMetaDataInfo.fileSize < 1048576) ? (Math.trunc((data.fileMetaDataInfo.fileSize / 1024) * 100) / 100 + " KB") : (Math.trunc((data.fileMetaDataInfo.fileSize / 1048576) * 100) / 100 + " MB"));
+                        const fileSizeText = (data.fileSize < 1024) ? (Math.trunc(data.fileSize * 100) / 100 + " B") : ((data.fileSize < 1048576) ? (Math.trunc((data.fileSize / 1024) * 100) / 100 + " KB") : (Math.trunc((data.fileSize / 1048576) * 100) / 100 + " MB"));
                         sizeSpan.textContent = fileSizeText
                         chatTextField.append(nameSpan, breaklineTag, sizeSpan)
 
                         // chatTextField.textContent = data.fileMetaDataInfo.upcomingFilename
 
                         chatTextField.classList.add("isLink")
-                        chatTextField.onclick = () => {
-                            props.socketContainer.current.send(JSON.stringify(
-                                {
-                                    type: "download-file-request-from-client",
-                                    sender: data.sender,
-                                    receiver: data.receiver,
-                                    fileMetaDataInfo: data.fileMetaDataInfo
+                        // chatTextField.onclick = () => {
+                        //     props.socketContainer.current.send(JSON.stringify(
+                        //         {
+                        //             type: "download-file-request-from-client",
+                        //             sender: data.sender,
+                        //             receiver: data.receiver,
+                        //             fileMetaDataInfo: data.fileMetaDataInfo
+                        //         }
+                        //     ))
+                        // }
+
+                        chatTextField.onclick = async () => {
+
+                            const response = await fetch(`${import.meta.env.VITE_BACKEND_URL}/download-file`, {
+                                method: "POST",
+                                headers: {
+
+
+                                    "X-Modified-Filename": data.upcomingFilename,
+                                    "X-Custom-Access-Token": props.userRef.current.customAccessToken,
+                                    "X-Sender-Id": props.userRef.current.id,
+                                    "X-Receiver-Id": userRef.current.focusedContact.id,
+                                    "X-Created-At": createdAt
+
                                 }
-                            ))
+                            })
+
+                            if (!response.ok) {
+                                const msg = await response.text();
+                                console.log(msg)
+                                return
+                            }
+
+                            try {
+                                // Ask user where to save file
+                                const handle = await window.showSaveFilePicker({
+                                    suggestedName: shortName
+                                    //types: [{ description: 'ZIP files', accept: { 'application/zip': ['.zip'] } }]
+                                });
+
+                                const writable = await handle.createWritable();
+
+                                const reader = response.body.getReader();
+
+
+
+                                while (true) {
+                                    const { done, value } = await reader.read();
+                                    if (done) break;
+                                    await writable.write(value);
+                                }
+
+                                await writable.close();
+                                alert("Download complete!");
+                            } catch (err) {
+                                console.error("Download failed:", err);
+                                alert("Download failed: " + err.message);
+                            }
+                            return
+
+
+
+                            // if (props.socketContainer.current.isStillDownloading) {
+                            //     console.error("wait a file is already downloading")
+                            //     return
+                            // }
+                            // props.socketContainer.current.send(JSON.stringify(
+                            //     {
+                            //         type: "download-file-request-from-client",
+                            //         sender: data.sender,
+                            //         receiver: data.receiver,
+                            //         fileMetaDataInfo: data.fileMetaDataInfo
+                            //     }
+                            // ))
                         }
 
 
@@ -1516,6 +1779,7 @@ export function Home(props) {
                 <header className=" header"
 
                 >
+                    {/* above is the black header */}
                     <div
                         style={{ visibility: (selectedReceiver.username || headerTitle !== "Globet") ? "visible" : "hidden", backgroundColor: "transparent" }}
                         onClick={
@@ -1551,10 +1815,13 @@ export function Home(props) {
                             }
                         }
                         className="button">
+                        {/* this is the back button */}
                         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-arrow-left" viewBox="0 0 16 16">
                             <path fill-rule="evenodd" d="M15 8a.5.5 0 0 0-.5-.5H2.707l3.147-3.146a.5.5 0 1 0-.708-.708l-4 4a.5.5 0 0 0 0 .708l4 4a.5.5 0 0 0 .708-.708L2.707 8.5H14.5A.5.5 0 0 0 15 8" />
                         </svg>
                     </div>
+
+                    {/* below div is profile photo and username of header */}
 
                     <div
                         className="profile-photo-and-username-in-header" style={{
@@ -1579,6 +1846,7 @@ export function Home(props) {
                         <i className={selectedReceiver.username ? "selected-username-holder" : ""}>{selectedReceiver.username || headerTitle}</i></div>
 
 
+                    {/* below div is the div to recent contacts */}
                     <div
                         className={props.recentUnreadContactCount ? "svg-container-inbox-icon" : "inbox"}
                         data-recent-contact-unread-count={props.recentUnreadContactCount}
@@ -1604,6 +1872,7 @@ export function Home(props) {
                             }
                         }
                     >
+                        {/* this is div to recent contact */}
 
                         <svg viewBox="0 0 24 24" height="24" width="24" preserveAspectRatio="xMidYMid meet" class="" fill="none">
 
@@ -1614,7 +1883,12 @@ export function Home(props) {
 
 
 
+
+
+                    {/* section below is menu bar , is face any css issue then check one app.css */}
+
                     <section
+
 
                         onClick={
                             () => {
@@ -1686,6 +1960,16 @@ export function Home(props) {
                         </aside>
 
 
+                    </section>
+
+                    <section
+                        className="button" ref={props.rtcbuttonRef}
+                        style={{ display: selectedReceiver.username ? "flex" : "none" }}
+                        onClick={props.rtcStarterFunction.current}
+                    >
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-telephone-plus-fill" viewBox="0 0 16 16">
+                            <path fill-rule="evenodd" d="M1.885.511a1.745 1.745 0 0 1 2.61.163L6.29 2.98c.329.423.445.974.315 1.494l-.547 2.19a.68.68 0 0 0 .178.643l2.457 2.457a.68.68 0 0 0 .644.178l2.189-.547a1.75 1.75 0 0 1 1.494.315l2.306 1.794c.829.645.905 1.87.163 2.611l-1.034 1.034c-.74.74-1.846 1.065-2.877.702a18.6 18.6 0 0 1-7.01-4.42 18.6 18.6 0 0 1-4.42-7.009c-.362-1.03-.037-2.137.703-2.877zM12.5 1a.5.5 0 0 1 .5.5V3h1.5a.5.5 0 0 1 0 1H13v1.5a.5.5 0 0 1-1 0V4h-1.5a.5.5 0 0 1 0-1H12V1.5a.5.5 0 0 1 .5-.5" />
+                        </svg>
                     </section>
 
                 </header>

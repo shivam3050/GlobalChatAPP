@@ -541,7 +541,7 @@ input[type="password"]:focus {
 
 
 
-.dashboard> :nth-child(1)> :nth-child(4) {
+.dashboard> :nth-child(1)> :nth-child(4) , .dashboard> :nth-child(1)> :nth-child(5) {
     /* this is select like tag which stores aside */
     background-color: transparent;
     /* padding: var(--max-padding); */

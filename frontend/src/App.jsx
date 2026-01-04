@@ -20,7 +20,13 @@ import { countries } from './controllers/allCountries.js';
 function App() {
   console.log("app route is called")
 
-  const socketContainer = useRef(null)
+  const socketContainer = useRef({})
+
+  const webrtcContainer = useRef({})
+
+  const rtcbuttonRef = useRef(null)
+
+  const rtcStarterFunction = useRef(null)
 
   const [user, setUser] = useState(null)
 
@@ -99,6 +105,124 @@ function App() {
 
   }, [])
 
+  rtcStarterFunction.current = async () => {
+    try {
+      // Check WebSocket is ready
+      if (!socketContainer.current || socketContainer.current.readyState !== 1) {
+        console.error("WebSocket not ready");
+        return;
+      }
+
+      const pc = new RTCPeerConnection();
+      webrtcContainer.current.pc = pc;
+      const dc = pc.createDataChannel("text");
+      webrtcContainer.current.dc = dc;
+
+      webrtcContainer.current.dc.onopen = () => {
+        console.log("Data channel open");
+        webrtcContainer.current.dc.send("Hello Sir");
+        rtcbuttonRef.current.style.backgroundColor = "red";
+        rtcbuttonRef.current.onclick = (e) => {
+          e.stopPropagation();
+          // Close the data channel first
+          if (webrtcContainer.current.dc) {
+            webrtcContainer.current.dc.close();
+            console.log("data channel closed")
+            webrtcContainer.current.dc = null;
+          }
+
+          // Then close the peer connection
+          if (webrtcContainer.current.pc) {
+            webrtcContainer.current.pc.close();
+            console.log("full connection closed")
+            webrtcContainer.current.pc = null;
+          }
+          rtcbuttonRef.current.onclick = rtcStarterFunction;
+          rtcbuttonRef.current.style.backgroundColor = "transparent";
+
+        }
+      };
+      webrtcContainer.current.dc.onmessage = (e) => {
+        console.log("Message from receiver:", e.data);
+        alert(e.data)
+      };
+
+      dc.onerror = (err) => console.error("Data channel error:", err);
+
+
+
+
+      pc.onicecandidate = (e) => {
+        if (e.candidate) {
+          try {
+            //THIS IS SIGNAL TO WS SERVER
+            socketContainer.current.send(
+              JSON.stringify({
+                type: "query-message",
+                queryType: "ice",
+                sender: { username: userRef.current.username, id: userRef.current.id, country: userRef.current.country, customAccessToken: userRef.current.customAccessToken },
+                receiver: userRef.current.focusedContact,
+                d: e.candidate
+              })
+            );
+          } catch (err) {
+            console.error("Failed to send ICE candidate:", err);
+          }
+        }
+      };
+
+
+
+
+
+      // Create and send offer , 
+      const offer = await webrtcContainer.current.pc.createOffer();
+
+      await webrtcContainer.current.pc.setLocalDescription(offer);
+
+      // Sending via websocket , this will hit server first
+      //THIS IS SIGNAL TO WS SERVER
+      socketContainer.current.send(
+        JSON.stringify({
+          type: "query-message",
+          sender: { username: userRef.current.username, id: userRef.current.id, country: userRef.current.country, customAccessToken: userRef.current.customAccessToken },
+          receiver: userRef.current.focusedContact,
+          queryType: "offer",
+          d: offer
+        })
+      );
+
+      // Cleanup on connection close
+      webrtcContainer.current.pc.onconnectionstatechange = () => {
+        // Only cleanup if connection actually failed or closed
+      if (webrtcContainer.current.pc && 
+          (webrtcContainer.current.pc.connectionState === "failed" ||
+           webrtcContainer.current.pc.connectionState === "closed")) {
+        
+        console.log("Connection failed/closed, cleaning up");
+        
+        // Close datachannel
+        if (webrtcContainer.current.dc) {
+          webrtcContainer.current.dc.close();
+          webrtcContainer.current.dc = null;
+        }
+        
+        // Close peer connection
+        webrtcContainer.current.pc.close();
+        webrtcContainer.current.pc = null;
+        
+        // Reset button
+        rtcbuttonRef.current.style.backgroundColor = "transparent";
+        rtcbuttonRef.current.onclick = rtcStarterFunction.current;
+      }
+      };
+
+    } catch (err) {
+      console.error("WebRTC setup failed:", err);
+      
+    }
+  }
+
   return (
 
     <Router>
@@ -107,6 +231,12 @@ function App() {
         <Route path="/" element={<Home
 
           socketContainer={socketContainer}
+
+          webrtcContainer={webrtcContainer}
+
+          rtcbuttonRef={rtcbuttonRef}
+
+          rtcStarterFunction={rtcStarterFunction}
 
           user={user}
 

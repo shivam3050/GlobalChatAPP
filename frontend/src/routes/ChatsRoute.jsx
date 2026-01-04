@@ -56,7 +56,7 @@ function ChatsRoute(props) {
         <aside className="user-vs-chat-container" >
             <ChatSection userRef={props.userRef} chatRef={props.chatRef} socketContainer={props.socketContainer} refreshChatsFlag={props.refreshChatsFlag} chatsDivRef={props.chatsDivRef} />
             <form className="formCreateChat" action="" method="post"
-                onSubmit={(e) => {
+                onSubmit={async(e) => {
 
                     e.preventDefault();
                     const formData = new FormData(e.currentTarget);
@@ -131,31 +131,54 @@ function ChatsRoute(props) {
 
                         chatsDiv?.scrollTo({ top: chatsDiv?.scrollHeight, behavior: 'smooth' })
 
+                        const attachmentButton = e.currentTarget.querySelector(".attachment");
+
+                        // I WILL UPLOAD USING HTTP INSTEAD OF SOCKET
+
+                        const response = await fetch(`${import.meta.env.VITE_BACKEND_URL}/upload-file`,{
+                            method: "POST",
+                            headers:{
+
+                                "Content-Type": "application/octet-stream",
+                                "X-Filename": file.name,
+                                "X-Custom-Access-Token": props.userRef.current.customAccessToken,
+                                "X-Sender-Id": props.userRef.current.id,
+                                "X-Receiver-Id": props.userRef.current.focusedContact.id,
+                                "X-Created-At": timestamp
+                            
+                            },
+                            body: file
+                        })
+
+                        console.log(response.text())
+
+                        // no need to check response here as if success then i will get message via socket
 
 
 
-                        const metadata = {
 
-                            type: "file-meta-data-to-server",
-                            createdAt: timestamp,
+                        // const metadata = {
 
-                            message: { filesize: file.size, filename: file.name },
-                            receiver: props.userRef.current.focusedContact,
-                            // sender: { username: props.userRef.current.username, id: props.userRef.current.id, age: props.userRef.current.age, gender: props.userRef.current.gender, country: props.userRef.current.country }
-                            sender: { username: props.userRef.current.username, id: props.userRef.current.id, country: props.userRef.current.country }
-                        };
+                        //     type: "file-meta-data-to-server",
+                        //     createdAt: timestamp,
+
+                        //     message: { filesize: file.size, filename: file.name },
+                        //     receiver: props.userRef.current.focusedContact,
+                        //     // sender: { username: props.userRef.current.username, id: props.userRef.current.id, age: props.userRef.current.age, gender: props.userRef.current.gender, country: props.userRef.current.country }
+                        //     sender: { username: props.userRef.current.username, id: props.userRef.current.id, country: props.userRef.current.country }
+                        // };
 
                         const filename = props.userRef.current.id + "_" + props.userRef.current.focusedContact.id + "_" + timestamp + "_" + file.name;
 
                         props.chatRef.current.filesToBeSent[filename] = file;
-                        console.log("see from send ", filename)
+                      
 
 
                         // first send metadata
-                        props.socketContainer.current.send(JSON.stringify(metadata));
+                        // props.socketContainer.current.send(JSON.stringify(metadata));
 
                         attachmentFileRef.current.value = "";
-                        const attachmentButton = e.currentTarget.querySelector(".attachment");
+                        
 
                         // inputPartDiv.removeChild(previewFloater)
                         attachmentButton.innerHTML = `
@@ -222,7 +245,7 @@ function ChatsRoute(props) {
                     textarea.focus()
 
                 }}>
-                <div>
+                <div className='parentOfTextArea'>
                     <textarea
 
                         spellCheck="false"
@@ -235,7 +258,7 @@ function ChatsRoute(props) {
                         style={{ resize: "none" }} placeholder={`Send to ${selectedReceiver}...`} name="message" maxLength="50000">
 
                     </textarea>
-                    <button className="attachment" type="button" onClick={(e) => {
+                    <button className="attachment" type="button" onClick={(e) => { // this is the file picker trigger button 
                         
                         const previewInstance = attachmentFileRef.current.previewInstance
 
@@ -257,7 +280,8 @@ function ChatsRoute(props) {
                             <path d="M4.5 3a2.5 2.5 0 0 1 5 0v9a1.5 1.5 0 0 1-3 0V5a.5.5 0 0 1 1 0v7a.5.5 0 0 0 1 0V3a1.5 1.5 0 1 0-3 0v9a2.5 2.5 0 0 0 5 0V5a.5.5 0 0 1 1 0v7a3.5 3.5 0 1 1-7 0z" />
                         </svg>
                     </button>
-                    <input ref={attachmentFileRef} style={{ display: "none" }} type="file" name="" onChange={(e) => {
+                    
+                    <input ref={attachmentFileRef} style={{ display: "none" }} type="file" name="" onChange={(e) => { // this is actually file picker
                         if (e.currentTarget.files.length > 0) {
 
                             const inputPartDiv = e.currentTarget.parentElement // this is input part i am not selecting it by class name or id so if in future you update any elements then do carefully

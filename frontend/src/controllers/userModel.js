@@ -2,6 +2,7 @@ export const userRef = {
 
     username: "",
     id: "",
+    customAccessToken: "",
     // age: null,
     // gender: "",
     country: "",

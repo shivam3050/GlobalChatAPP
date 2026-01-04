@@ -11,7 +11,8 @@ import path from "path";
 
 
 
-const requestChatToken = async (currentUserPrompt, fewHistory = null) => {
+
+export const requestChatToken = async (currentUserPrompt, fewHistory = null) => {
 
     let contents = [
 
@@ -99,7 +100,7 @@ export const getChatList = async (senderId, receiverId) => {
             },
             { senderId: 1, receiverId: 1, content: 1, createdAt: 1, isLink: 1, fileSize: 1, _id: 0 }
         ).sort({ createdAt: 1 })
-        
+
 
 
         return messages
@@ -160,7 +161,7 @@ export const deleteAllAssociatedFiles = async (userid, dir) => {
         return false
     }
 }
-const deleteOneFile = (path) => {
+export const deleteOneFile = (path) => {
     try {
         const ans = fs.unlink(path);
         return true
@@ -170,7 +171,7 @@ const deleteOneFile = (path) => {
     }
 }
 
-const createReadStreamOfAFile = (filepath) => {
+export const createReadStreamOfAFile = (filepath) => {
     if (!fs.existsSync(filepath)) {
         console.log("File not exist");
         return null;
@@ -180,7 +181,7 @@ const createReadStreamOfAFile = (filepath) => {
     console.log("File exist");
     return { readStream: fs.createReadStream(filepath), fileSize: fs.statSync(filepath).size };
 }
-const filesGarbageCollectorFunction = async (dir) => {
+export const filesGarbageCollectorFunction = async (dir) => {
     try {
         const files = await fs.promises.readdir(dir); // returns array of file names
         const mins = 20 * 60000;
@@ -229,6 +230,7 @@ class Client {
         // this.gender = gender,
         this.country = country;
         this.id = this.generateId();
+        this.customAccessToken = this.simpleHash(this.id.toString())
 
         if (typeof socket === "string") {
 
@@ -249,6 +251,23 @@ class Client {
         }
         return `${now}${Client.counter++}`;
     }
+    simpleHash(text) {
+
+        if (!text || text.length === 0) {
+            return null;
+        }
+
+        let hash = 0n; // Use BigInt to avoid overflow issues
+        for (let i = 0; i < text.length; i++) {
+            hash = (hash * 31n + BigInt(text.charCodeAt(i))) & 0xFFFFFFFFFFFFn; // Keep within 48 bits
+        }
+
+        // Convert BigInt to hex string (lowercase)
+        let hex = hash.toString(16);
+
+        // Pad with leading zeros to make it exactly 16 characters
+        return hex.padStart(16, '0').slice(-16);
+    }
 }
 
 
@@ -267,7 +286,7 @@ console.log("Folder ID:", folderId);
 
 const rootDir = process.cwd();
 
-const handlingFilesDir = path.join(rootDir, 'handlingFilesDir');
+export const handlingFilesDir = path.join(rootDir, 'handlingFilesDir');
 
 // Create directory if it doesn't exist
 if (!fs.existsSync(handlingFilesDir)) {
@@ -283,7 +302,7 @@ let running = false;
 
 
 
-const filesGarbageCollectorInterval = setInterval(async () => {
+export const filesGarbageCollectorInterval = setInterval(async () => {
     if (!running) {
         running = true;
         console.log("files garbage collector is running!")
@@ -304,7 +323,7 @@ const filesGarbageCollectorInterval = setInterval(async () => {
 
 
 
-const activeClients = new Map()
+export const activeClients = new Map()
 
 // first client will be stars ai
 const StarAI = new Client("StarAI", "nocountry", "socket-to-StarAI")
@@ -313,6 +332,10 @@ activeClients.set(StarAI.id, StarAI)
 console.log("StartAi is active")
 
 export const newConnectionHandler = async (dbname, httpServer, allowedOrigin) => {
+
+
+
+
 
     const server = new WebSocketServer(
         {
@@ -358,7 +381,7 @@ export const newConnectionHandler = async (dbname, httpServer, allowedOrigin) =>
         // const gender = query.gender
 
         const country = query.country
-        
+
 
 
 
@@ -382,7 +405,7 @@ export const newConnectionHandler = async (dbname, httpServer, allowedOrigin) =>
         // }
         // const availableUsers = [...activeClients.entries()].map(([username, client], _, __) => ({ username: client.username, age: client.age, gender: client.gender, country: client.country, id: client.id }))
         const availableUsers = [...activeClients.entries()].map(([username, client], _, __) => {
-            
+
 
             return { username: client.username, country: client.country, id: client.id, unread: false }
         })
@@ -392,7 +415,7 @@ export const newConnectionHandler = async (dbname, httpServer, allowedOrigin) =>
 
         activeClients.set(client.id, client); //     KEY VALUE , ID : AND CLIENT
 
-   
+
 
 
 
@@ -406,6 +429,7 @@ export const newConnectionHandler = async (dbname, httpServer, allowedOrigin) =>
                 // gender: client.gender,
                 country: client.country,
                 id: client.id,
+                customAccessToken: client.customAccessToken,
 
                 availableUsers: availableUsers
 
@@ -675,7 +699,6 @@ export const newConnectionHandler = async (dbname, httpServer, allowedOrigin) =>
 
 
                 }
-
                 else if (type === "query-message") {
 
                     if (queryType === "chat-list-demand") {
@@ -732,6 +755,63 @@ export const newConnectionHandler = async (dbname, httpServer, allowedOrigin) =>
 
                         )
 
+                        return
+                    }
+                    else if (queryType === "offer") {
+                        const presentSender = activeClients.get(sender?.id)
+                        const presentReceiver = activeClients.get(receiver?.id)
+                        if (!presentReceiver || !presentSender) {
+                            console.error("sender or receiver are gone")
+                            return
+                        }
+
+                        presentReceiver.socket.send(JSON.stringify({
+                            type: "query-message",
+                            query: "offer",
+                            d: data.d,
+                            sender: presentSender,
+                            receiver: presentReceiver
+                        }))
+
+
+                        return
+                    }
+                    else if (queryType === "answer") {
+                        const presentSender = activeClients.get(sender?.id)
+                        const presentReceiver = activeClients.get(receiver?.id)
+                        if (!presentReceiver || !presentSender) {
+                            console.error("sender or receiver are gone , restart process")
+                            return
+                        }
+
+                        presentReceiver.socket.send(JSON.stringify({
+                            type: "query-message",
+                            query: "answer",
+                            d: data.d,
+                            sender: presentSender,
+                            receiver: presentReceiver
+                        }))
+
+
+                        return
+                    }
+                    else if (queryType === "ice") {
+                        const presentSender = activeClients.get(sender?.id);
+                        const presentReceiver = activeClients.get(receiver?.id);
+
+                        if (!presentReceiver || !presentSender) {
+                            console.error("sender or receiver are gone during ICE exchange");
+                            return;
+                        }
+
+                        // Forward ICE candidate to receiver
+                        presentReceiver.socket.send(JSON.stringify({
+                            type: "query-message",
+                            d: data.d,
+                            query: "ice",
+                            sender: presentSender,
+                            receiver: presentReceiver
+                        }));
                         return
                     }
                     else {
@@ -910,10 +990,10 @@ export const newConnectionHandler = async (dbname, httpServer, allowedOrigin) =>
                     sender.fileMetaDataInfo.upcomingFilestream = null;
 
                     // here i can attach a chat to db about this file
-                    console.log("showing size when adding on db ",fileMetaDataInfo.fileSize)
+                    console.log("showing size when adding on db ", fileMetaDataInfo.fileSize)
                     const result = await createNewOneChat(sender.id, fileMetaDataInfo.receiver.id, fileMetaDataInfo.upcomingFilename, fileMetaDataInfo.createdAt, true, fileMetaDataInfo.fileSize)
 
-                    
+
                     sender.fileMetaDataInfo = null;
 
                     if (!result) {
