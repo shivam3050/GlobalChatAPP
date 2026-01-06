@@ -565,7 +565,7 @@ webRTCContainerRef.current.webRTCStartFunction = async (motive = null) => {
   try {
     // Check WebSocket readiness
     if (!socketContainer.current || socketContainer.current.readyState !== 1) {
-      alert("WebSocket not ready");
+      // alert("WebSocket not ready");
       console.error("WebSocket not ready");
       return;
     }
@@ -573,7 +573,7 @@ webRTCContainerRef.current.webRTCStartFunction = async (motive = null) => {
     // Cleanup existing connection if any
     if (webRTCContainerRef.current.senderPC) {
       if (webRTCContainerRef.current.senderPC.connectionState === "connected") {
-        alert("A connection already exists, close it first.");
+        // alert("A connection already exists, close it first.");
         console.error("A connection already exists, close it first.");
         return;
       }
@@ -581,7 +581,7 @@ webRTCContainerRef.current.webRTCStartFunction = async (motive = null) => {
         webRTCContainerRef.current.senderPC.getSenders().forEach(s => s.track && s.track.stop());
         webRTCContainerRef.current.senderPC.close();
       } catch (err) {
-        alert("Error closing previous peer connection: " + err.message);
+        // alert("Error closing previous peer connection: " + err.message);
         console.error("Error closing previous peer connection:", err);
       }
       webRTCContainerRef.current.senderPC = null;
@@ -638,7 +638,7 @@ webRTCContainerRef.current.webRTCStartFunction = async (motive = null) => {
 
         console.log("Receiver track added to sender side element");
       } catch (err) {
-        alert("Error handling incoming track: " + err.message);
+        // alert("Error handling incoming track: " + err.message);
         console.error("Error handling incoming track:", err);
       }
     };
@@ -651,10 +651,10 @@ webRTCContainerRef.current.webRTCStartFunction = async (motive = null) => {
       };
       webRTCContainerRef.current.senderDC.onmessage = (e) => {
         console.log("Message from receiver:", e.data);
-        alert(e.data);
+        // alert(e.data);
       };
       webRTCContainerRef.current.senderDC.onerror = (err) => { 
-        alert("Data channel error: " + err.message);
+        // alert("Data channel error: " + err.message);
         console.error("Data channel error:", err);
       };
     }
@@ -676,7 +676,7 @@ webRTCContainerRef.current.webRTCStartFunction = async (motive = null) => {
             d: e.candidate
           }));
         } catch (err) {
-          alert("Failed to send ICE candidate: " + err.message);
+          // alert("Failed to send ICE candidate: " + err.message);
           console.error("Failed to send ICE candidate:", err);
         }
       }
@@ -699,7 +699,7 @@ webRTCContainerRef.current.webRTCStartFunction = async (motive = null) => {
         d: offer
       }));
     } catch(err) {
-      alert("Failed to create/send offer: " + err.message);
+      // alert("Failed to create/send offer: " + err.message);
       console.error("Failed to create/send offer:", err);
       return;
     }
@@ -726,14 +726,14 @@ webRTCContainerRef.current.webRTCStartFunction = async (motive = null) => {
         rtcbuttonRef.current.onclick = (e)=>{ e.stopPropagation(); cleanup(); };
       }
       if(pc.connectionState === "failed" || pc.connectionState === "closed"){
-        alert("Connection failed/closed");
+        // alert("Connection failed/closed");
         console.log("Connection failed/closed, cleaning up");
         cleanup();
       }
     };
 
   } catch (err) {
-    alert("WebRTC setup failed: " + err.message);
+    // alert("WebRTC setup failed: " + err.message);
     console.error("WebRTC setup failed:", err);
   }
 };
