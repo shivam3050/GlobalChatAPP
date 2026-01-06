@@ -753,6 +753,7 @@ export function Home(props) {
 
                         if (!pc) {
                             console.error("No peer connection to add ICE candidate to");
+                            alert("No peer connection to add ICE candidate to")
                             return;
                         }
 
@@ -764,12 +765,15 @@ export function Home(props) {
                                 }
                                 props.webRTCContainerRef.current.iceQueue.push(data.d);
                                 console.log("Remote description not set yet, ICE queued", data.d);
+                                 alert("Remote description not set yet, ICE queued")
                             } else {
                                 await pc.addIceCandidate(new RTCIceCandidate(data.d));
                                 console.log("ICE candidate added successfully:", data.d);
+                                 
                             }
                         } catch (err) {
                             console.error("Failed to add ICE candidate:", err);
+                            alert("Failed to add ICE candidate:")
                         }
                         return;
                     }
@@ -780,6 +784,7 @@ export function Home(props) {
 
                         if (!pc) {
                             console.error("Cannot set remote description: peer connection missing");
+                            alert("Cannot set remote description: peer connection missing")
                             return;
                         }
 
@@ -795,6 +800,7 @@ export function Home(props) {
                                         console.log("Queued ICE candidate added:", ice);
                                     } catch (e) {
                                         console.error("Failed to add queued ICE:", e);
+                                        alert("Failed to add queued ICE:")
                                     }
                                 }
                                 // Clear queue
@@ -802,6 +808,7 @@ export function Home(props) {
                             }
                         } catch (err) {
                             console.error("Failed to set remote description (answer):", err);
+                            alert("Failed to set remote description (answer):")
                         }
                         return;
                     }
@@ -844,6 +851,7 @@ export function Home(props) {
                     //     return
                     // }
                     console.error("invalid query but valid type in the respnse")
+                    alert("invalid query but valid type in the respnse")
                     return
                 }
 
