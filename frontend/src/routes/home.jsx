@@ -589,21 +589,22 @@ export function Home(props) {
                     // }
                     if (data.query === "offer") {
                         try {
-                            // -------------------- Existing connection check (same as before) --------------------
+
                             if (props.webRTCContainerRef.current.senderPC) {
-                                console.error("Sorry, already have a connection. Cannot accept new offer.");
+                                console.error("Sorry, already a connection");
                                 return;
                             }
 
-                            // -------------------- Create new RTCPeerConnection --------------------
+
                             const pc = new RTCPeerConnection();
                             props.webRTCContainerRef.current.senderPC = pc;
 
-                            // -------------------- Get or reuse sender stream --------------------
+
                             let stream = props.webRTCContainerRef.current.senderStreamsObject;
+
                             if (!stream || !stream.getVideoTracks()[0] || stream.getVideoTracks()[0].readyState !== "live") {
                                 try {
-                                    stream = await navigator.mediaDevices.getUserMedia({ video: true });
+                                    stream = await navigator.mediaDevices.getUserMedia({ video: true , audio: true });
                                     props.webRTCContainerRef.current.senderStreamsObject = stream;
                                     console.log("Capturing new stream at receiver");
                                 } catch (err) {
@@ -611,23 +612,31 @@ export function Home(props) {
                                     return; // HARD STOP
                                 }
                             } else {
-                                console.log("Reusing existing camera stream");
+                                console.log("using the existing camera stream");
                             }
 
-                            // -------------------- Add tracks BEFORE setRemoteDescription --------------------
-                            const tracksArray = stream.getTracks();
-                            props.webRTCContainerRef.current.senderTracksContainerArray = tracksArray;
-                            tracksArray.forEach(track => pc.addTrack(track, stream));
 
-                            // -------------------- ontrack event --------------------
+                            const tracksArray = stream.getTracks();
+
+                            props.webRTCContainerRef.current.senderTracksContainerArray = tracksArray;
+
+                            // tracksArray.forEach(track => pc.addTrack(track, stream));
+
+                            pc.addTrack(stream.getVideoTracks()[0], stream)
+                            pc.addTrack(stream.getAudioTracks()[0], stream)
+
+
                             pc.ontrack = (event) => {
+                                if(event.track.kind==="audio"){
+                                    return
+                                }
                                 if (props.webRTCContainerRef.current.streamElementAtReceiver?.parentNode) {
                                     props.webRTCContainerRef.current.streamElementAtReceiver.remove();
                                 }
 
                                 const el = document.createElement(event.track.kind);
                                 el.style.zIndex = "20";
-                                el.style.width = "clamp(100px,80%,500px)";
+                                el.style.width = "clamp(100px,80%,400px)";
                                 el.autoplay = true;
                                 el.controls = true;
                                 el.srcObject = event.streams[0];
@@ -635,7 +644,8 @@ export function Home(props) {
                                 props.webRTCContainerRef.current.streamElementAtReceiver = el;
                                 props.webRTCContainerRef.current.senderTC = event.track;
 
-                                const parent = document.getElementById("chats-div");
+                                const parent = document.getElementById("chats-div"); // THIS NEEDS TO BE CHANGED WHERE YOU WANT TO PUT THIS ELEMENT OF RECEIVER SIDE
+
                                 props.webRTCContainerRef.current.streamElementParentAtReceiver = parent;
                                 if (parent) parent.appendChild(el);
 
@@ -646,7 +656,7 @@ export function Home(props) {
                                 setTimeout(() => el.play().catch(err => console.error("Playback failed:", err)), 100);
                             };
 
-                            // -------------------- ondatachannel event --------------------
+                            
                             pc.ondatachannel = (event) => {
                                 const dc = event.channel;
                                 props.webRTCContainerRef.current.senderDC = dc;
@@ -659,7 +669,7 @@ export function Home(props) {
                                 dc.onerror = err => console.error("DataChannel error:", err);
                             };
 
-                            // -------------------- ICE candidate handler --------------------
+                            
                             pc.onicecandidate = (e) => {
                                 if (e.candidate) {
                                     try {
@@ -674,7 +684,7 @@ export function Home(props) {
                                 }
                             };
 
-                            // -------------------- Set remote description and create/send answer --------------------
+                            
                             console.log("Setting remote description (offer)...");
                             await pc.setRemoteDescription(data.d);
                             const answer = await pc.createAnswer();
@@ -688,7 +698,7 @@ export function Home(props) {
                                 d: answer
                             }));
 
-                            // -------------------- Connection state change handler --------------------
+                           
                             pc.onconnectionstatechange = () => {
                                 const state = pc.connectionState;
                                 console.log("Connection state:", state);
@@ -714,6 +724,7 @@ export function Home(props) {
 
                                     // Peer connection cleanup
                                     if (props.webRTCContainerRef.current.senderPC) {
+                                        props.webRTCContainerRef.current.senderPC.getSenders().forEach(sender => { if (sender.track) { sender.track.stop(); pc.removeTrack(sender); } });
                                         props.webRTCContainerRef.current.senderPC.close();
                                         props.webRTCContainerRef.current.senderPC = null;
                                         console.log("Peer connection closed");
@@ -724,6 +735,8 @@ export function Home(props) {
                                     props.rtcbuttonRef.current.onclick = () => {
                                         props.webRTCContainerRef.current.webRTCStartFunction("mediastream");
                                     };
+
+
                                 };
 
                                 if (state === "connected") {
@@ -747,7 +760,7 @@ export function Home(props) {
                         }
                         return;
                     }
-                    // -------------------- ICE candidate --------------------
+                   
                     if (data.query === "ice") {
                         const pc = props.webRTCContainerRef.current.senderPC;
 
@@ -769,7 +782,7 @@ export function Home(props) {
                             } else {
                                 await pc.addIceCandidate(new RTCIceCandidate(data.d));
                                 console.log("ICE candidate added successfully:", data.d);
-                                 
+
                             }
                         } catch (err) {
                             console.error("Failed to add ICE candidate:", err);
@@ -778,7 +791,7 @@ export function Home(props) {
                         return;
                     }
 
-                    // -------------------- ANSWER --------------------
+                
                     if (data.query === "answer") {
                         const pc = props.webRTCContainerRef.current.senderPC;
 

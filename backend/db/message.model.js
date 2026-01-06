@@ -22,7 +22,7 @@ const messageSchema = new Schema({
     default: false
   },
   fileSize: {
-    type: Number,
+    type: Number, 
     default: 0
   }
 },
