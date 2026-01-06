@@ -588,200 +588,261 @@ export function Home(props) {
                     //     return
                     // }
                     if (data.query === "offer") {
-    try {
-        // -------------------- Existing connection check (same as before) --------------------
-        if (props.webRTCContainerRef.current.senderPC) {
-            console.error("Sorry, already have a connection. Cannot accept new offer.");
-            return;
-        }
+                        try {
+                            // -------------------- Existing connection check (same as before) --------------------
+                            if (props.webRTCContainerRef.current.senderPC) {
+                                console.error("Sorry, already have a connection. Cannot accept new offer.");
+                                return;
+                            }
 
-        // -------------------- Create new RTCPeerConnection --------------------
-        const pc = new RTCPeerConnection();
-        props.webRTCContainerRef.current.senderPC = pc;
+                            // -------------------- Create new RTCPeerConnection --------------------
+                            const pc = new RTCPeerConnection();
+                            props.webRTCContainerRef.current.senderPC = pc;
 
-        // -------------------- Get or reuse sender stream --------------------
-        let stream = props.webRTCContainerRef.current.senderStreamsObject;
-        if (!stream || !stream.getVideoTracks()[0] || stream.getVideoTracks()[0].readyState !== "live") {
-            try {
-                stream = await navigator.mediaDevices.getUserMedia({ video: true });
-                props.webRTCContainerRef.current.senderStreamsObject = stream;
-                console.log("Capturing new stream at receiver");
-            } catch (err) {
-                console.error("Camera unavailable:", err.name);
-                return; // HARD STOP
-            }
-        } else {
-            console.log("Reusing existing camera stream");
-        }
+                            // -------------------- Get or reuse sender stream --------------------
+                            let stream = props.webRTCContainerRef.current.senderStreamsObject;
+                            if (!stream || !stream.getVideoTracks()[0] || stream.getVideoTracks()[0].readyState !== "live") {
+                                try {
+                                    stream = await navigator.mediaDevices.getUserMedia({ video: true });
+                                    props.webRTCContainerRef.current.senderStreamsObject = stream;
+                                    console.log("Capturing new stream at receiver");
+                                } catch (err) {
+                                    console.error("Camera unavailable:", err.name);
+                                    return; // HARD STOP
+                                }
+                            } else {
+                                console.log("Reusing existing camera stream");
+                            }
 
-        // -------------------- Add tracks BEFORE setRemoteDescription --------------------
-        const tracksArray = stream.getTracks();
-        props.webRTCContainerRef.current.senderTracksContainerArray = tracksArray;
-        tracksArray.forEach(track => pc.addTrack(track, stream));
+                            // -------------------- Add tracks BEFORE setRemoteDescription --------------------
+                            const tracksArray = stream.getTracks();
+                            props.webRTCContainerRef.current.senderTracksContainerArray = tracksArray;
+                            tracksArray.forEach(track => pc.addTrack(track, stream));
 
-        // -------------------- ontrack event --------------------
-        pc.ontrack = (event) => {
-            if (props.webRTCContainerRef.current.streamElementAtReceiver?.parentNode) {
-                props.webRTCContainerRef.current.streamElementAtReceiver.remove();
-            }
+                            // -------------------- ontrack event --------------------
+                            pc.ontrack = (event) => {
+                                if (props.webRTCContainerRef.current.streamElementAtReceiver?.parentNode) {
+                                    props.webRTCContainerRef.current.streamElementAtReceiver.remove();
+                                }
 
-            const el = document.createElement(event.track.kind);
-            el.style.zIndex = "20";
-            el.style.width = "clamp(100px,80%,500px)";
-            el.autoplay = true;
-            el.controls = true;
-            el.srcObject = event.streams[0];
+                                const el = document.createElement(event.track.kind);
+                                el.style.zIndex = "20";
+                                el.style.width = "clamp(100px,80%,500px)";
+                                el.autoplay = true;
+                                el.controls = true;
+                                el.srcObject = event.streams[0];
 
-            props.webRTCContainerRef.current.streamElementAtReceiver = el;
-            props.webRTCContainerRef.current.senderTC = event.track;
+                                props.webRTCContainerRef.current.streamElementAtReceiver = el;
+                                props.webRTCContainerRef.current.senderTC = event.track;
 
-            const parent = document.getElementById("chats-div");
-            props.webRTCContainerRef.current.streamElementParentAtReceiver = parent;
-            if (parent) parent.appendChild(el);
+                                const parent = document.getElementById("chats-div");
+                                props.webRTCContainerRef.current.streamElementParentAtReceiver = parent;
+                                if (parent) parent.appendChild(el);
 
-            // Track state logs
-            event.track.onmute = () => console.log("Track muted");
-            event.track.onunmute = () => console.log("Track unmuted");
+                                // Track state logs
+                                event.track.onmute = () => console.log("Track muted");
+                                event.track.onunmute = () => console.log("Track unmuted");
 
-            setTimeout(() => el.play().catch(err => console.error("Playback failed:", err)), 100);
-        };
+                                setTimeout(() => el.play().catch(err => console.error("Playback failed:", err)), 100);
+                            };
 
-        // -------------------- ondatachannel event --------------------
-        pc.ondatachannel = (event) => {
-            const dc = event.channel;
-            props.webRTCContainerRef.current.senderDC = dc;
+                            // -------------------- ondatachannel event --------------------
+                            pc.ondatachannel = (event) => {
+                                const dc = event.channel;
+                                props.webRTCContainerRef.current.senderDC = dc;
 
-            dc.onopen = () => {
-                console.log("Data channel open (receiver)");
-                dc.send("Hello back Sir");
-            };
-            dc.onmessage = e => { console.log("Message from sender:", e.data); alert(e.data); };
-            dc.onerror = err => console.error("DataChannel error:", err);
-        };
+                                dc.onopen = () => {
+                                    console.log("Data channel open (receiver)");
+                                    dc.send("Hello back Sir");
+                                };
+                                dc.onmessage = e => { console.log("Message from sender:", e.data); alert(e.data); };
+                                dc.onerror = err => console.error("DataChannel error:", err);
+                            };
 
-        // -------------------- ICE candidate handler --------------------
-        pc.onicecandidate = (e) => {
-            if (e.candidate) {
-                try {
-                    props.socketContainer.current.send(JSON.stringify({
-                        type: "query-message",
-                        queryType: "ice",
-                        sender: { username: props.userRef.current.username, id: props.userRef.current.id, country: props.userRef.current.country, customAccessToken: props.userRef.current.customAccessToken },
-                        receiver: props.userRef.current.focusedContact,
-                        d: e.candidate
-                    }));
-                } catch (err) { console.error("Failed to send ICE candidate:", err); }
-            }
-        };
+                            // -------------------- ICE candidate handler --------------------
+                            pc.onicecandidate = (e) => {
+                                if (e.candidate) {
+                                    try {
+                                        props.socketContainer.current.send(JSON.stringify({
+                                            type: "query-message",
+                                            queryType: "ice",
+                                            sender: { username: props.userRef.current.username, id: props.userRef.current.id, country: props.userRef.current.country, customAccessToken: props.userRef.current.customAccessToken },
+                                            receiver: props.userRef.current.focusedContact,
+                                            d: e.candidate
+                                        }));
+                                    } catch (err) { console.error("Failed to send ICE candidate:", err); }
+                                }
+                            };
 
-        // -------------------- Set remote description and create/send answer --------------------
-        console.log("Setting remote description (offer)...");
-        await pc.setRemoteDescription(data.d);
-        const answer = await pc.createAnswer();
-        await pc.setLocalDescription(answer);
+                            // -------------------- Set remote description and create/send answer --------------------
+                            console.log("Setting remote description (offer)...");
+                            await pc.setRemoteDescription(data.d);
+                            const answer = await pc.createAnswer();
+                            await pc.setLocalDescription(answer);
 
-        props.socketContainer.current.send(JSON.stringify({
-            type: "query-message",
-            sender: { username: props.userRef.current.username, id: props.userRef.current.id, country: props.userRef.current.country, customAccessToken: props.userRef.current.customAccessToken },
-            receiver: props.userRef.current.focusedContact,
-            queryType: "answer",
-            d: answer
-        }));
+                            props.socketContainer.current.send(JSON.stringify({
+                                type: "query-message",
+                                sender: { username: props.userRef.current.username, id: props.userRef.current.id, country: props.userRef.current.country, customAccessToken: props.userRef.current.customAccessToken },
+                                receiver: props.userRef.current.focusedContact,
+                                queryType: "answer",
+                                d: answer
+                            }));
 
-        // -------------------- Connection state change handler --------------------
-        pc.onconnectionstatechange = () => {
-            const state = pc.connectionState;
-            console.log("Connection state:", state);
+                            // -------------------- Connection state change handler --------------------
+                            pc.onconnectionstatechange = () => {
+                                const state = pc.connectionState;
+                                console.log("Connection state:", state);
 
-            const cleanup = () => {
-                // Track cleanup
-                if (props.webRTCContainerRef.current.senderTC) {
-                    props.webRTCContainerRef.current.senderTC.stop();
-                    const el = props.webRTCContainerRef.current.streamElementAtReceiver;
-                    const parent = props.webRTCContainerRef.current.streamElementParentAtReceiver;
-                    if (el && parent && parent.contains(el)) parent.removeChild(el);
-                    props.webRTCContainerRef.current.streamElementAtReceiver = null;
-                    props.webRTCContainerRef.current.senderTC = null;
-                    console.log("Track cleaned up");
-                }
+                                const cleanup = () => {
+                                    // Track cleanup
+                                    if (props.webRTCContainerRef.current.senderTC) {
+                                        props.webRTCContainerRef.current.senderTC.stop();
+                                        const el = props.webRTCContainerRef.current.streamElementAtReceiver;
+                                        const parent = props.webRTCContainerRef.current.streamElementParentAtReceiver;
+                                        if (el && parent && parent.contains(el)) parent.removeChild(el);
+                                        props.webRTCContainerRef.current.streamElementAtReceiver = null;
+                                        props.webRTCContainerRef.current.senderTC = null;
+                                        console.log("Track cleaned up");
+                                    }
 
-                // Data channel cleanup
-                if (props.webRTCContainerRef.current.senderDC) {
-                    props.webRTCContainerRef.current.senderDC.close();
-                    props.webRTCContainerRef.current.senderDC = null;
-                    console.log("Data channel closed");
-                }
+                                    // Data channel cleanup
+                                    if (props.webRTCContainerRef.current.senderDC) {
+                                        props.webRTCContainerRef.current.senderDC.close();
+                                        props.webRTCContainerRef.current.senderDC = null;
+                                        console.log("Data channel closed");
+                                    }
 
-                // Peer connection cleanup
-                if (props.webRTCContainerRef.current.senderPC) {
-                    props.webRTCContainerRef.current.senderPC.close();
-                    props.webRTCContainerRef.current.senderPC = null;
-                    console.log("Peer connection closed");
-                }
+                                    // Peer connection cleanup
+                                    if (props.webRTCContainerRef.current.senderPC) {
+                                        props.webRTCContainerRef.current.senderPC.close();
+                                        props.webRTCContainerRef.current.senderPC = null;
+                                        console.log("Peer connection closed");
+                                    }
 
-                // Reset button
-                props.rtcbuttonRef.current.style.backgroundColor = "transparent";
-                props.rtcbuttonRef.current.onclick = () => {
-                    props.webRTCContainerRef.current.webRTCStartFunction("mediastream");
-                };
-            };
+                                    // Reset button
+                                    props.rtcbuttonRef.current.style.backgroundColor = "transparent";
+                                    props.rtcbuttonRef.current.onclick = () => {
+                                        props.webRTCContainerRef.current.webRTCStartFunction("mediastream");
+                                    };
+                                };
 
-            if (state === "connected") {
-                console.log("✅ Peer connection SUCCESS!");
-                props.rtcbuttonRef.current.style.backgroundColor = "red";
+                                if (state === "connected") {
+                                    console.log("✅ Peer connection SUCCESS!");
+                                    props.rtcbuttonRef.current.style.backgroundColor = "red";
 
-                props.rtcbuttonRef.current.onclick = (e) => {
-                    e.stopPropagation();
-                    cleanup();
-                };
-            }
+                                    props.rtcbuttonRef.current.onclick = (e) => {
+                                        e.stopPropagation();
+                                        cleanup();
+                                    };
+                                }
 
-            if (state === "failed" || state === "closed") {
-                console.log("Connection failed/closed");
-                cleanup();
-            }
-        };
+                                if (state === "failed" || state === "closed") {
+                                    console.log("Connection failed/closed");
+                                    cleanup();
+                                }
+                            };
 
-    } catch (err) {
-        console.error("Receiver WebRTC setup failed:", err);
-    }
-    return;
-}
-
+                        } catch (err) {
+                            console.error("Receiver WebRTC setup failed:", err);
+                        }
+                        return;
+                    }
+                    // -------------------- ICE candidate --------------------
                     if (data.query === "ice") {
+                        const pc = props.webRTCContainerRef.current.senderPC;
 
-                        if (!props.webRTCContainerRef.current.senderPC) {
+                        if (!pc) {
                             console.error("No peer connection to add ICE candidate to");
                             return;
                         }
 
                         try {
-                            console.log("came in try case")
-                            console.log("consoling data.d in query ice, ", data.d)
-                            await props.webRTCContainerRef.current.senderPC.addIceCandidate(new RTCIceCandidate(data.d));
-                            console.log("ICE candidate added successfully");
+                            // Agar remote description nahi hai, ICE candidate ko queue me daal do
+                            if (!pc.remoteDescription || !pc.remoteDescription.type) {
+                                if (!props.webRTCContainerRef.current.iceQueue) {
+                                    props.webRTCContainerRef.current.iceQueue = [];
+                                }
+                                props.webRTCContainerRef.current.iceQueue.push(data.d);
+                                console.log("Remote description not set yet, ICE queued", data.d);
+                            } else {
+                                await pc.addIceCandidate(new RTCIceCandidate(data.d));
+                                console.log("ICE candidate added successfully:", data.d);
+                            }
                         } catch (err) {
                             console.error("Failed to add ICE candidate:", err);
                         }
-                        return
+                        return;
                     }
+
+                    // -------------------- ANSWER --------------------
                     if (data.query === "answer") {
+                        const pc = props.webRTCContainerRef.current.senderPC;
 
-                        if (!props.webRTCContainerRef.current.senderPC) {
-                            console.error("cannot continue in this answer query.")
-                            return
+                        if (!pc) {
+                            console.error("Cannot set remote description: peer connection missing");
+                            return;
+                        }
 
-                        };
+                        try {
+                            await pc.setRemoteDescription(new RTCSessionDescription(data.d));
+                            console.log("Remote description (answer) applied");
 
-                        // Set the remote description so WebRTC can finalize the connection
-                        props.webRTCContainerRef.current.senderPC.setRemoteDescription(new RTCSessionDescription(data.d))
-                            .then(() => {
-                                console.log("Remote description (answer) applied, connection should complete");
-                            })
-                            .catch(err => console.error("Failed to set remote description:", err));
-
-                        return
+                            // Agar ICE candidates queue me hain, ab unhe add karo
+                            if (props.webRTCContainerRef.current.iceQueue?.length) {
+                                for (const ice of props.webRTCContainerRef.current.iceQueue) {
+                                    try {
+                                        await pc.addIceCandidate(new RTCIceCandidate(ice));
+                                        console.log("Queued ICE candidate added:", ice);
+                                    } catch (e) {
+                                        console.error("Failed to add queued ICE:", e);
+                                    }
+                                }
+                                // Clear queue
+                                props.webRTCContainerRef.current.iceQueue = [];
+                            }
+                        } catch (err) {
+                            console.error("Failed to set remote description (answer):", err);
+                        }
+                        return;
                     }
+
+
+                    // if (data.query === "ice") {
+
+
+
+                    //     if (!props.webRTCContainerRef.current.senderPC) {
+                    //         console.error("No peer connection to add ICE candidate to");
+                    //         return;
+                    //     }
+
+                    //     try {
+                    //         console.log("came in try case")
+                    //         console.log("consoling data.d in query ice, ", data.d)
+                    //         await props.webRTCContainerRef.current.senderPC.addIceCandidate(new RTCIceCandidate(data.d));
+                    //         console.log("ICE candidate added successfully");
+                    //     } catch (err) {
+                    //         console.error("Failed to add ICE candidate:", err);
+                    //     }
+                    //     return
+                    // }
+                    // if (data.query === "answer") {
+
+                    //     if (!props.webRTCContainerRef.current.senderPC) {
+                    //         console.error("cannot continue in this answer query.")
+                    //         return
+
+                    //     };
+
+                    //     // Set the remote description so WebRTC can finalize the connection
+                    //     props.webRTCContainerRef.current.senderPC.setRemoteDescription(new RTCSessionDescription(data.d))
+                    //         .then(() => {
+                    //             console.log("Remote description (answer) applied, connection should complete");
+                    //         })
+                    //         .catch(err => console.error("Failed to set remote description:", err));
+
+                    //     return
+                    // }
                     console.error("invalid query but valid type in the respnse")
                     return
                 }

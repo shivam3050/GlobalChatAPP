@@ -115,7 +115,11 @@ export const webRTCContainerRef = {
     streamElementParentAtReceiver : null,
 
     webRTCStartFunction : null,
-    webRTCStopFunction : null
+    webRTCStopFunction : null,
+
+
+
+    iceQueue: null
 
 
 }
