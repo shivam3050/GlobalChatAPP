@@ -283,21 +283,39 @@ button {
     box-shadow: none;
     cursor: pointer;
     -webkit-tap-highlight-color: transparent;
+    
+}
+.hovereffectbtn{
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
 }
 
 input[type="submit"]:focus,
 input[type="button"]:focus,
 .button:focus,
-button:focus {
+button:focus,
+.hovereffectbtn:focus {
     outline: none;
-    box-shadow: none;
+
+   
+
+}
+input[type="submit"]:hover,
+input[type="button"]:hover,
+.button:hover,
+button:hover,
+.hovereffectbtn:hover {
+    outline: none;
+
+    box-shadow: inset 0 0 0 9999px rgba(0,0,0,0.08);
 
 }
 
-input[type="text"]:focus,
-input[type="number"]:focus,
-input[type="password"]:focus {
+input[type="text"]:hover,
+input[type="number"]:hover,
+input[type="password"]:hover {
     outline: none;
+    box-shadow: inset 0 0 0 9999px rgba(0,0,0,0.08);
 }
 
 
@@ -1412,35 +1430,26 @@ input[type="password"]:focus {
         top: 0
     }
 }
+.elementOnwhichStartStopSTT {
+ 
+    background:#1f2937;
+    display: inline-block;
+    margin-top: 2px;
+    box-shadow: 1px 1px 1px 1px black;
+    width: clamp(40px,30%,100px);
+    outline: none;
+    
+    border-bottom-right-radius: calc(5*var(--med-border-radius));
+    border-bottom-left-radius: calc(5*var(--med-border-radius));
+    border: var(--min-border-radius) dotted var(--border-color);
+}
 /* Add this to your CSS file */
-/* Create a hoverable container for the video */
-.dashboard > :nth-child(1) > :nth-child(5) {
-    position: relative;
-}
 
-.dashboard > :nth-child(1) > :nth-child(5) .webrtcdivkeeper,
-.dashboard > :nth-child(1) > :nth-child(5) .webrtcdivkeeper {
-    border: 2px solid transparent;
-    border-radius: 10px;
-    background-color: var(--dark-black);
-    box-shadow: 0px 0px 5px 1px black;
-    cursor: pointer;
-    transition: all 0.3s ease;
-}
 
-/* Hover on the video itself */
-.dashboard > :nth-child(1) > :nth-child(5) .webrtcdivkeeper:hover,
-.dashboard > :nth-child(1) > :nth-child(5) .webrtcdivkeeper:hover {
-    transform: scale(1.03);
-    border-color: var(--professional-blue);
-    box-shadow: 0px 0px 20px 4px rgba(0, 100, 255, 0.7);
-}
 
-/* Active state for click feedback */
-.dashboard > :nth-child(1) > :nth-child(5) .webrtcdivkeeper:active,
-.dashboard > :nth-child(1) > :nth-child(5) .webrtcdivkeeper:active {
-    transform: scale(0.98);
-}
+
+
+
 
 .bouncing-last-three-dots-animation> :nth-last-child(3) {
     transition: top;

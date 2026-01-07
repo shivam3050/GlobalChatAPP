@@ -604,7 +604,7 @@ export function Home(props) {
 
                             if (!stream || !stream.getVideoTracks()[0] || stream.getVideoTracks()[0].readyState !== "live") {
                                 try {
-                                    stream = await navigator.mediaDevices.getUserMedia({ video: true , audio: true });
+                                    stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
                                     props.webRTCContainerRef.current.senderStreamsObject = stream;
                                     console.log("Capturing new stream at receiver");
                                 } catch (err) {
@@ -627,7 +627,7 @@ export function Home(props) {
 
 
                             pc.ontrack = (event) => {
-                                if(event.track.kind==="audio"){
+                                if (event.track.kind === "audio") {
                                     return
                                 }
                                 if (props.webRTCContainerRef.current.streamElementAtReceiver?.parentNode) {
@@ -636,18 +636,258 @@ export function Home(props) {
 
                                 const el = document.createElement(event.track.kind);
                                 el.style.zIndex = "20";
-                                el.style.width = "clamp(100px,80%,400px)";
+                                el.style.width = "100%";
+                                el.style.borderRadius= "calc(5*var(--med-border-radius))"
                                 el.autoplay = true;
                                 el.controls = true;
                                 el.srcObject = event.streams[0];
 
-                                props.webRTCContainerRef.current.streamElementAtReceiver = el;
+                                const videoDivAndSTTBtnContainer = document.createElement("section")
+                                videoDivAndSTTBtnContainer.style.width = "clamp(100px,80%,400px)";
+                                videoDivAndSTTBtnContainer.style.boxShadow = "1px 1px 2px 1px black";
+                                videoDivAndSTTBtnContainer.style.border = "1px solid black";
+                                // lets create a voice capturer for speech to text
+                                const button = document.createElement("button")
+                                videoDivAndSTTBtnContainer.appendChild(el) // this is the video element
+                                videoDivAndSTTBtnContainer.appendChild(button) // this is stt button
+
+
+                                props.webRTCContainerRef.current.streamElementAtReceiver = videoDivAndSTTBtnContainer;
                                 props.webRTCContainerRef.current.senderTC = event.track;
+
+
+
+
+
+
+
 
                                 const parent = document.getElementById("chats-div"); // THIS NEEDS TO BE CHANGED WHERE YOU WANT TO PUT THIS ELEMENT OF RECEIVER SIDE
 
+                                const startVoiceCaptureForSTT = async () => {
+
+                                    if (props.webRTCContainerRef.current.recogniserStreamObject && props.webRTCContainerRef.current.recogniserStreamObject.recogniser) {
+                                        console.error("a recogniser for stt is already running")
+                                        return false
+                                    }
+
+
+
+                                    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+                                    const recogniser = new SpeechRecognition()
+
+                                    props.webRTCContainerRef.current.recogniserStreamObject = { recogniser: recogniser, stoppedByUser: false, finalText: "" }
+
+                                    recogniser.continuous = true;
+                                    recogniser.interimResults = false;
+
+                                    recogniser.onresult = (event) => {
+                                        console.log("on result fired")
+
+
+                                        const currentFinalPhraseIndex = event.results.length - 1
+
+                                        console.log(event.results)
+
+                                        // SpeechRecognitionResultList[
+                                        //     {
+                                        //         transcript: "it is again working",
+                                        //         confidence: 0.8295,
+                                        //         isFinal: true
+                                        //     },
+                                        //     {
+                                        //         transcript: " started",
+                                        //         confidence: 0.8869,
+                                        //         isFinal: true
+                                        //     },
+                                        //     {
+                                        //         transcript: " started",
+                                        //         confidence: 0.8494,
+                                        //         isFinal: true
+                                        //     },
+                                        //     {
+                                        //         transcript: " recognise",
+                                        //         confidence: 0.8359,
+                                        //         isFinal: true
+                                        //     }
+                                        // ]
+
+
+
+                                        // console.log(event.results[0].isFinal)
+                                        // console.log(event.results[0][0].transcript)
+
+                                        if (event.results[currentFinalPhraseIndex].isFinal) { // this check is for api basis
+                                            props.webRTCContainerRef.current.recogniserStreamObject.finalText += " " + event.results[currentFinalPhraseIndex][0].transcript;
+
+                                            console.log("Final captured text :  ", props.webRTCContainerRef.current.recogniserStreamObject.finalText)
+
+                                            // if(props.webRTCContainerRef.current.recogniserStreamObject.stoppedByUser){ // user stopped capture button and response came later, this is the condition
+                                                props.webRTCContainerRef.current.recogniserStreamObject.isARequestMadeBySTT = false
+                                            // } 
+
+
+
+                                        } else {
+                                            console.log("this was not is isFinal, ignore")
+                                            // ignore, due to api basis
+                                        }
+                                    }
+                                    recogniser.onend = () => {
+                                        if (!props.webRTCContainerRef.current.recogniserStreamObject.stoppedByUser) {
+
+                                            try {
+                                                recogniser.start()
+                                                props.webRTCContainerRef.current.recogniserStreamObject.isARequestMadeBySTT = true
+                                                
+                                            } catch (error) {
+                                                console.log(error)
+                                            }
+                                        }
+
+                                    }
+                                    recogniser.onerror = (e) => {
+                                        console.error("Error:", e.error);
+                                    };
+                                    recogniser.onabort = (e) => {
+                                        props.webRTCContainerRef.current.recogniserStreamObject.recogniser.stream.getTracks().forEach(track => track.stop());
+                                        props.webRTCContainerRef.current.recogniserStreamObject.recogniser.onresult = null
+                                        props.webRTCContainerRef.current.recogniserStreamObject.recogniser.onend = null
+                                        props.webRTCContainerRef.current.recogniserStreamObject.recogniser.onerror = null
+                                        props.webRTCContainerRef.current.recogniserStreamObject.recogniser = null
+                                        props.webRTCContainerRef.current.recogniserStreamObject.stoppedByUser = true
+                                        props.webRTCContainerRef.current.recogniserStreamObject = null
+                                    }
+
+
+
+                                    try {
+                                        recogniser.start()
+                                        props.webRTCContainerRef.current.recogniserStreamObject.isARequestMadeBySTT = true
+                                        return true
+                                    } catch (error) {
+                                        return false
+                                    }
+
+
+                                }
+                                button.textContent = "Start STT"
+                                //lets have some css
+                                // button.style.background = "#16a34a"
+                                button.classList.add("hovereffectbtn")
+                                button.classList.add("elementOnwhichStartStopSTT")
+
+                                const resumeVoiceCapture = (elementOnwhichIsFlagOCapturing) => {
+                                    if (!props.webRTCContainerRef.current.recogniserStreamObject?.stoppedByUser) {
+                                        console.error("not stopped by user, so cannot start")
+                                        return
+                                    };
+                                    try {
+
+                                        const recogniser = props.webRTCContainerRef.current.recogniserStreamObject?.recogniser
+                                        if (!recogniser) {
+                                            console.error("recogniser already not exists")
+                                            return
+                                        }
+                                        recogniser.start();
+                                        props.webRTCContainerRef.current.recogniserStreamObject.isARequestMadeBySTT = true
+                                        props.webRTCContainerRef.current.recogniserStreamObject.stoppedByUser = false
+
+                                        elementOnwhichIsFlagOCapturing.textContent = "Stop STT"
+                                        // elementOnwhichIsFlagOCapturing.style.backgroundColor = "#16a34a"
+                                        elementOnwhichIsFlagOCapturing.style.boxShadow = "1px 1px 1px 1px green";
+                                        elementOnwhichIsFlagOCapturing.onclick = () => pauseVoiceCapture(elementOnwhichIsFlagOCapturing)
+
+                                    } catch (error) {
+                                        elementOnwhichIsFlagOCapturing.textContent = "Start STT"
+                                        elementOnwhichIsFlagOCapturing.style.backgroundColor = "#1f2937"
+                                        elementOnwhichIsFlagOCapturing.style.boxShadow = "1px 1px 1px 1px black";
+                                        elementOnwhichIsFlagOCapturing.onclick = () => resumeVoiceCapture(elementOnwhichIsFlagOCapturing)
+
+                                    }
+                                }
+                                const pauseVoiceCapture = async (elementOnwhichIsFlagOCapturing) => {
+                                    const recogniser = props.webRTCContainerRef.current.recogniserStreamObject?.recogniser
+                                    if (!recogniser) {
+                                        console.error("recogniser already not exists")
+                                        return
+                                    }
+                                    try {
+                                        recogniser.stop()
+                                        
+                                        
+                                    } catch (error) {
+                                        console.error(error)
+                                        return
+                                    }
+
+
+                                    elementOnwhichIsFlagOCapturing.textContent = "Start STT"
+                                    elementOnwhichIsFlagOCapturing.style.backgroundColor = "#1f2937"
+                                    elementOnwhichIsFlagOCapturing.style.boxShadow = "1px 1px 1px 1px black";
+                                    props.webRTCContainerRef.current.recogniserStreamObject.stoppedByUser = true
+
+                                    const scannedText = document.createElement("div")
+                                    // i will add a slight delay
+
+                                    //polling
+                                
+                                    let loopcounter = 0
+                                    while (props.webRTCContainerRef.current.recogniserStreamObject.isARequestMadeBySTT) { // this condition will break loop if the onresult last response arrived
+                                        if(loopcounter>=50) {break}; // this is terminating hardly after 5 seconds preventing very long polling
+                                        
+                                        await new Promise((resolve) => { // this way i am reducing the high cpu usage of while loop, and nothing else the use of promise
+                                            setTimeout(resolve, 100)
+                                            loopcounter++;
+                                        })
+                                        
+                                    }
+
+
+                                    if(props.webRTCContainerRef.current.recogniserStreamObject.finalText.length!==0){
+
+                                        scannedText.textContent = props.webRTCContainerRef.current.recogniserStreamObject.finalText
+                                        parent.appendChild(scannedText) // i am temporary appending in the chatsdiv these messages
+                                    }
+
+                                    props.webRTCContainerRef.current.recogniserStreamObject.finalText = "";
+
+                                    elementOnwhichIsFlagOCapturing.onclick = () => resumeVoiceCapture(elementOnwhichIsFlagOCapturing)
+
+                                }
+
+                                button.onclick = async (e) => {
+
+                                    if (await startVoiceCaptureForSTT()) { // this is starting first time
+
+
+
+                                        button.onclick = () => pauseVoiceCapture(button)
+                                        button.textContent = "Stop STT"
+                                        // button.style.backgroundColor = "#16a34a"
+                                        button.style.boxShadow = "1px 1px 1px 1px green";
+                                    } else {
+                                        button.textContent = "Start STT"
+                                        button.style.backgroundColor = "#1f2937"
+                                        button.style.boxShadow = "1px 1px 1px 1px black";
+                                    }
+
+
+
+
+                                }
+
+
                                 props.webRTCContainerRef.current.streamElementParentAtReceiver = parent;
-                                if (parent) parent.appendChild(el);
+
+                                if (parent) {
+
+                                    parent.appendChild(videoDivAndSTTBtnContainer);
+
+
+
+                                };
 
                                 // Track state logs
                                 event.track.onmute = () => console.log("Track muted");
@@ -656,7 +896,7 @@ export function Home(props) {
                                 setTimeout(() => el.play().catch(err => console.error("Playback failed:", err)), 100);
                             };
 
-                            
+
                             pc.ondatachannel = (event) => {
                                 const dc = event.channel;
                                 props.webRTCContainerRef.current.senderDC = dc;
@@ -669,7 +909,7 @@ export function Home(props) {
                                 dc.onerror = err => console.error("DataChannel error:", err);
                             };
 
-                            
+
                             pc.onicecandidate = (e) => {
                                 if (e.candidate) {
                                     try {
@@ -684,7 +924,7 @@ export function Home(props) {
                                 }
                             };
 
-                            
+
                             console.log("Setting remote description (offer)...");
                             await pc.setRemoteDescription(data.d);
                             const answer = await pc.createAnswer();
@@ -698,7 +938,7 @@ export function Home(props) {
                                 d: answer
                             }));
 
-                           
+
                             pc.onconnectionstatechange = () => {
                                 const state = pc.connectionState;
                                 console.log("Connection state:", state);
@@ -760,7 +1000,7 @@ export function Home(props) {
                         }
                         return;
                     }
-                   
+
                     if (data.query === "ice") {
                         const pc = props.webRTCContainerRef.current.senderPC;
 
@@ -791,7 +1031,7 @@ export function Home(props) {
                         return;
                     }
 
-                
+
                     if (data.query === "answer") {
                         const pc = props.webRTCContainerRef.current.senderPC;
 
@@ -2213,7 +2453,7 @@ export function Home(props) {
 
                     {/* below div is the div to recent contacts */}
                     <div
-                        className={props.recentUnreadContactCount ? "svg-container-inbox-icon" : "inbox"}
+                        className={props.recentUnreadContactCount ? "svg-container-inbox-icon hovereffectbtn" : "inbox hovereffectbtn"}
                         data-recent-contact-unread-count={props.recentUnreadContactCount}
                         ref={inboxIconRef}
 
@@ -2263,7 +2503,7 @@ export function Home(props) {
                             }
                         }
                         id="controls"
-                        className="button"
+                        className="button hovereffectbtn"
                         style={{ display: selectedReceiver.username ? "none" : "flex" }}
 
                     >
@@ -2282,21 +2522,21 @@ export function Home(props) {
                         }}>
                             <button onClick={
                                 (e) => { e.stopPropagation(); controlUserCallback(e) }
-                            } className="option" value="close">
+                            } className="option hovereffectbtn" value="close">
                                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-x-lg" viewBox="0 0 16 16">
                                     <path d="M2.146 2.854a.5.5 0 1 1 .708-.708L8 7.293l5.146-5.147a.5.5 0 0 1 .708.708L8.707 8l5.147 5.146a.5.5 0 0 1-.708.708L8 8.707l-5.146 5.147a.5.5 0 0 1-.708-.708L7.293 8z" />
                                 </svg>
                             </button>
                             <button onClick={
                                 (e) => { e.stopPropagation(); controlUserCallback(e) }
-                            } className="option" value="callai">
+                            } className="option hovereffectbtn" value="callai">
                                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-openai" viewBox="0 0 16 16">
                                     <path d="M14.949 6.547a3.94 3.94 0 0 0-.348-3.273 4.11 4.11 0 0 0-4.4-1.934A4.1 4.1 0 0 0 8.423.2 4.15 4.15 0 0 0 6.305.086a4.1 4.1 0 0 0-1.891.948 4.04 4.04 0 0 0-1.158 1.753 4.1 4.1 0 0 0-1.563.679A4 4 0 0 0 .554 4.72a3.99 3.99 0 0 0 .502 4.731 3.94 3.94 0 0 0 .346 3.274 4.11 4.11 0 0 0 4.402 1.933c.382.425.852.764 1.377.995.526.231 1.095.35 1.67.346 1.78.002 3.358-1.132 3.901-2.804a4.1 4.1 0 0 0 1.563-.68 4 4 0 0 0 1.14-1.253 3.99 3.99 0 0 0-.506-4.716m-6.097 8.406a3.05 3.05 0 0 1-1.945-.694l.096-.054 3.23-1.838a.53.53 0 0 0 .265-.455v-4.49l1.366.778q.02.011.025.035v3.722c-.003 1.653-1.361 2.992-3.037 2.996m-6.53-2.75a2.95 2.95 0 0 1-.36-2.01l.095.057L5.29 12.09a.53.53 0 0 0 .527 0l3.949-2.246v1.555a.05.05 0 0 1-.022.041L6.473 13.3c-1.454.826-3.311.335-4.15-1.098m-.85-6.94A3.02 3.02 0 0 1 3.07 3.949v3.785a.51.51 0 0 0 .262.451l3.93 2.237-1.366.779a.05.05 0 0 1-.048 0L2.585 9.342a2.98 2.98 0 0 1-1.113-4.094zm11.216 2.571L8.747 5.576l1.362-.776a.05.05 0 0 1 .048 0l3.265 1.86a3 3 0 0 1 1.173 1.207 2.96 2.96 0 0 1-.27 3.2 3.05 3.05 0 0 1-1.36.997V8.279a.52.52 0 0 0-.276-.445m1.36-2.015-.097-.057-3.226-1.855a.53.53 0 0 0-.53 0L6.249 6.153V4.598a.04.04 0 0 1 .019-.04L9.533 2.7a3.07 3.07 0 0 1 3.257.139c.474.325.843.778 1.066 1.303.223.526.289 1.103.191 1.664zM5.503 8.575 4.139 7.8a.05.05 0 0 1-.026-.037V4.049c0-.57.166-1.127.476-1.607s.752-.864 1.275-1.105a3.08 3.08 0 0 1 3.234.41l-.096.054-3.23 1.838a.53.53 0 0 0-.265.455zm.742-1.577 1.758-1 1.762 1v2l-1.755 1-1.762-1z" />
                                 </svg>
                             </button>
                             <button onClick={
                                 (e) => { e.stopPropagation(); controlUserCallback(e) }
-                            } className="option " value="username"
+                            } className="option hovereffectbtn" value="username"
                                 style={{
                                     fontFamily: "cursive",
                                     color: "var(--professional-blue)",
@@ -2308,7 +2548,7 @@ export function Home(props) {
                             ><i className="selected-username-holder-noborder">{props.userRef.current.username}</i></button>
                             <button onClick={
                                 (e) => { e.stopPropagation(); controlUserCallback(e) }
-                            } className="option" value="refresh" style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: '10px' }}>
+                            } className="option hovereffectbtn" value="refresh" style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: '10px' }}>
                                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-arrow-repeat" viewBox="0 0 16 16">
                                     <path d="M11.534 7h3.932a.25.25 0 0 1 .192.41l-1.966 2.36a.25.25 0 0 1-.384 0l-1.966-2.36a.25.25 0 0 1 .192-.41m-11 2h3.932a.25.25 0 0 0 .192-.41L2.692 6.23a.25.25 0 0 0-.384 0L.342 8.59A.25.25 0 0 0 .534 9" />
                                     <path fill-rule="evenodd" d="M8 3c-1.552 0-2.94.707-3.857 1.818a.5.5 0 1 1-.771-.636A6.002 6.002 0 0 1 13.917 7H12.9A5 5 0 0 0 8 3M3.1 9a5.002 5.002 0 0 0 8.757 2.182.5.5 0 1 1 .771.636A6.002 6.002 0 0 1 2.083 9z" />
@@ -2316,7 +2556,7 @@ export function Home(props) {
                             </button>
                             <button onClick={
                                 (e) => { e.stopPropagation(); controlUserCallback(e) }
-                            } className="option" value="logout" style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: '10px', color: "red" }}>
+                            } className="option hovereffectbtn" value="logout" style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: '10px', color: "red" }}>
                                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-box-arrow-left" viewBox="0 0 16 16">
                                     <path fill-rule="evenodd" d="M6 12.5a.5.5 0 0 0 .5.5h8a.5.5 0 0 0 .5-.5v-9a.5.5 0 0 0-.5-.5h-8a.5.5 0 0 0-.5.5v2a.5.5 0 0 1-1 0v-2A1.5 1.5 0 0 1 6.5 2h8A1.5 1.5 0 0 1 16 3.5v9a1.5 1.5 0 0 1-1.5 1.5h-8A1.5 1.5 0 0 1 5 12.5v-2a.5.5 0 0 1 1 0z" />
                                     <path fill-rule="evenodd" d="M.146 8.354a.5.5 0 0 1 0-.708l3-3a.5.5 0 1 1 .708.708L1.707 7.5H10.5a.5.5 0 0 1 0 1H1.707l2.147 2.146a.5.5 0 0 1-.708.708z" />
@@ -2332,7 +2572,7 @@ export function Home(props) {
                     {/* below is call button for rtc */}
 
                     <section
-                        className="button" ref={props.rtcbuttonRef}
+                        className="button hovereffectbtn" ref={props.rtcbuttonRef}
                         style={{ display: selectedReceiver.username ? "flex" : "none" }}
                         onClick={() => { props.webRTCContainerRef.current.webRTCStartFunction("mediastream") }}
                     >
@@ -2404,7 +2644,7 @@ export function Home(props) {
                             <fieldset>
 
                                 <legend>Username</legend>
-                                <input required type="text" name="username" />
+                                <input required type="text" name="username" value={"" + Math.floor(Math.random() * 101)} />
 
                             </fieldset>
 

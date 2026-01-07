@@ -37,7 +37,7 @@ export const UserSection = (props) => {
             updateAvailableUsersInUI.map((user, index) => {
 
                 return (
-                    <div
+                    <div className="hovereffectbtn"
                         onClick={
                              () => {
 

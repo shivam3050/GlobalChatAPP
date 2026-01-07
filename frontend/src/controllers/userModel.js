@@ -96,17 +96,15 @@ export const chatsRef = {
 export const webRTCContainerRef = {
 
     senderPC : null,
-    receiverPC : null,
-    senderPreviousMotive : "",
-    receiverPreviousMotive : "",
+   
     senderStreamsObject : null,
     senderTracksContainerArray : [],
 
     senderDC : null,
-    receiverDC : null,
+    
 
     senderTC : null,
-    receiverTC : null,
+  
 
     streamElementAtSender : null,
     streamElementParentAtSender : null,
@@ -119,7 +117,11 @@ export const webRTCContainerRef = {
 
 
 
-    iceQueue: null
+    iceQueue: null,
+
+    recogniserStream: null,
+
+    isARequestMadeBySTT: false
 
 
 }
