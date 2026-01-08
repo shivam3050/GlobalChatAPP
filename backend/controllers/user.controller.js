@@ -51,7 +51,7 @@ export const requestChatToken = async (currentUserPrompt, fewHistory = null) => 
         const errorData = await res.json()
         console.log(errorData?.error?.message)
 
-        return "StarAI is busy right now , so it cannot response to you."
+        return "Star-AI is busy right now , so it cannot response to you."
 
     }
 
@@ -865,7 +865,7 @@ export const newConnectionHandler = async (dbname, httpServer, allowedOrigin) =>
                             d: data.d,
                             sender: presentSender,
                             receiver: presentReceiver,
-                            ttsTrackId: data?.ttsTrackId
+                          
                         }))
 
 
@@ -885,7 +885,7 @@ export const newConnectionHandler = async (dbname, httpServer, allowedOrigin) =>
                             d: data.d,
                             sender: presentSender,
                             receiver: presentReceiver,
-                            ttsTrackId: data?.ttsTrackId
+                          
                         }))
 
 
