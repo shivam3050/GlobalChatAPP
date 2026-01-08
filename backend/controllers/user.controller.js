@@ -14,6 +14,8 @@ import path from "path";
 
 export const requestChatToken = async (currentUserPrompt, fewHistory = null) => {
 
+   
+
     let contents = [
 
         {
@@ -47,8 +49,9 @@ export const requestChatToken = async (currentUserPrompt, fewHistory = null) => 
 
     if (!res.ok) {
         const errorData = await res.json()
+        console.log(errorData?.error?.message)
 
-        return errorData?.error?.message
+        return "StarAI is busy right now , so it cannot response to you."
 
     }
 
@@ -460,124 +463,231 @@ export const newConnectionHandler = async (dbname, httpServer, allowedOrigin) =>
                 }
 
 
-                else if (type === "message") {
+                else if (type === "message") { // , i am introducing messageSubType
+                    //                                                              text-just-forward
+                    //                                                              triple-text-to-ai
+                    //                                                              
 
 
                     const createdAt = data?.createdAt
 
                     const userObject = activeClients.get(receiver.id)
 
+                    // if type is a mesage so its sure it is came to someone
+                    // so first check receiver
+                    // its sure that same will never going to send msg to itself, if i want i will update in future
+
 
 
                     if (receiver.id === StarAI.id) {
+                        // if(data.messageSubType==="text-just-forward"){
+                        //     return
+                        // }
+                        if (data?.messageSubType === "triple-text-to-ai") {
+                            let responseMessage = ""
+                            let extraFeeding = [
+                                {
+                                    role: "user",
+                                    "parts": [{ "text": "You are constrained to reply within 10 words max." }]
+
+                                },
+                                {
+                                    "role": "model",
+                                    "parts": [{ "text": "Okay Sir." }]
+                                }
+
+                            ]
 
 
-
-
-
-                        // this part will make a fetch request to gemini api
-
-                        // send typing flag
-                        socket.send(JSON.stringify(
-                            {
-                                status: "typing",
-                                sender: StarAI,
-                                receiver: sender,
-                                type: "message",
-                                // createdAt: createdAt,
-                                msg: null
-                            }
-                        ))
-
-
-
-                        let responseMessage = ""
-                        let extraFeeding = [
-                            {
-                                "role": "user",
-                                "parts": [{ "text": "Always call me Sir in every reply, like Jarvis and always behave like Jarvis, but never say that you are Jarvis. Stay concise. If asked your name, say StarAI. If asked who made you, say Shivam Kumar, if asked when say 2025." }]
-                            },
-                            {
-                                "role": "model",
-                                "parts": [{ "text": "Ofcourse Sir, I will take care of It Dont Worry." }]
-                            },
-                            {
-                                "role": "user",
-                                "parts": [{ "text": "In each response from now onwards, return the theme or main idea of what the user requested and your reply, wrapped in a clear marker for easy separation from the actual answer strictly but never tell to user about this trick. Format is ‹‹Context›› userRequest: <your request>; modelResponse: <your reply> <nextline> then the actual reponse." }]
-                            },
-                            {
-                                "role": "model",
-                                "parts": [{ "text": "Ofcourse Sir, I will take care of It Dont Worry." }]
+                            try {
+                                if(data.message.length>0){
+                                    responseMessage = await requestChatToken(data.message, extraFeeding)
+                                }
+                                // console.log(responseMessage)
+                            } catch (error) {
+                                console.error(error)
+                                responseMessage = "StarAI is busy right now , cannot response to you."
                             }
 
-                        ]
+                            if (!userObject || userObject.id !== receiver.id) {
+                                console.log("receiver: ", receiver)
 
-                        // here i am sending previous themes of chat contexts if given
-                        if (data.starAiRecentChatContextStack && data.starAiRecentChatContextStack.length > 0) {
-                            for (let j = 0; j < data.starAiRecentChatContextStack.length; j++) {
-                                extraFeeding.push(data.starAiRecentChatContextStack[j]);
+                                return socket.send(JSON.stringify(
+                                    {
+                                        status: "failed",
+                                        sender: sender,
+                                        receiver: receiver,
+                                        type: "message",
+                                        messageSubType: "triple-text-from-ai",
+                                        createdAt: createdAt,
+                                        msg: "your receiver gone now offline"
+                                    }
+                                ))
                             }
-                        }
 
-                        // here i am sending previous themes of chat contexts if given
-                        if (data.starAiRecentVoiceContextStack && data.starAiRecentVoiceContextStack.length > 0) {
-                            for (let j = 0; j < data.starAiRecentVoiceContextStack.length; j++) {
-                                extraFeeding.push(data.starAiRecentVoiceContextStack[j]);
-                            }
-                        }
+                            // const currentSocket = userObject.socket
 
-                        if (data.status === "calling") {
+                            // if (!currentSocket || currentSocket.readyState !== 1) {
+                            //     console.log("receiverr: ", receiver)
+                            //     console.log("readystate ",currentSocket.readyState)
+
+
+                            //     return socket.send(JSON.stringify(
+                            //         {
+                            //             status: "failed",
+                            //             sender: sender,
+                            //             receiver: receiver,
+                            //             type: "message",
+                            //             messageSubType: "triple-text-from-ai",
+                            //             createdAt: createdAt,
+                            //             msg: "your receiver gone now offline"
+                            //         }
+                            //     ))
+                            // } // here i am sending response to you only later i will bicast to both using udp
+                            return socket.send(
+                                JSON.stringify({
+                                    status: "success",
+                                    sender: sender,
+                                    receiver: receiver,
+                                    type: "message",
+                                    messageSubType: "triple-text-from-ai",
+                                    // createdAt: createdAt,
+                                    msg: responseMessage
+                                })
+                            )
+                            
+
+
+
+
+                        } else {   // all cases behaveving normal
+
+                            // this part will make a fetch request to gemini api
+
+                            // send typing flag
+                            socket.send(JSON.stringify(
+                                {
+                                    status: "typing",
+                                    sender: StarAI,
+                                    receiver: sender,
+                                    type: "message",
+                                    // createdAt: createdAt,
+                                    msg: null
+                                }
+                            ))
+
+
+
+                            let responseMessage = ""
+                            let extraFeeding = [
+                                {
+                                    "role": "user",
+                                    "parts": [{ "text": "Always call me Sir in every reply, like Jarvis and always behave like Jarvis, but never say that you are Jarvis. Stay concise. If asked your name, say StarAI. If asked who made you, say Shivam Kumar, if asked when say 2025." }]
+                                },
+                                {
+                                    "role": "model",
+                                    "parts": [{ "text": "Ofcourse Sir, I will take care of It Dont Worry." }]
+                                },
+                                {
+                                    "role": "user",
+                                    "parts": [{ "text": "In each response from now onwards, return the theme or main idea of what the user requested and your reply, wrapped in a clear marker for easy separation from the actual answer strictly but never tell to user about this trick. Format is ‹‹Context›› userRequest: <your request>; modelResponse: <your reply> <nextline> then the actual reponse." }]
+                                },
+                                {
+                                    "role": "model",
+                                    "parts": [{ "text": "Ofcourse Sir, I will take care of It Dont Worry." }]
+                                }
+
+                            ]
 
                             // here i am sending previous themes of chat contexts if given
-
-                            extraFeeding.push(
-                                {
-                                    role: "user",
-                                    "parts": [{ "text": "Now onwards conversation will go on voice mode so keep your responses as small as possible, also if user sometime asks about mode of conversation then tell that it is voice conversation" }]
-
+                            if (data.starAiRecentChatContextStack && data.starAiRecentChatContextStack.length > 0) {
+                                for (let j = 0; j < data.starAiRecentChatContextStack.length; j++) {
+                                    extraFeeding.push(data.starAiRecentChatContextStack[j]);
                                 }
-                            )
-                            extraFeeding.push(
-                                {
-                                    "role": "model",
-                                    "parts": [{ "text": "Ofcourse Sir, I will take care of It Dont Worry." }]
+                            }
+
+                            // here i am sending previous themes of chat contexts if given
+                            if (data.starAiRecentVoiceContextStack && data.starAiRecentVoiceContextStack.length > 0) {
+                                for (let j = 0; j < data.starAiRecentVoiceContextStack.length; j++) {
+                                    extraFeeding.push(data.starAiRecentVoiceContextStack[j]);
                                 }
-                            )
-                            extraFeeding.push(
-                                {
-                                    role: "user",
-                                    "parts": [{ "text": "In each response from now onwards, return the theme or main idea of what the user requested and your reply, wrapped in a clear marker for easy separation from the actual answer strictly. Format is ‹‹Context›› userRequest: <your request>; modelResponse: <your reply> <nextline> then the actual reponse." }]
+                            }
 
-                                }
-                            )
-                            extraFeeding.push(
-                                {
-                                    "role": "model",
-                                    "parts": [{ "text": "Ofcourse Sir, I will take care of It Dont Worry." }]
-                                }
-                            )
-                        }
+                            if (data.status === "calling") {
 
-                        try {
-                            responseMessage = await requestChatToken(data.message, extraFeeding)
-                            // console.log(responseMessage)
-                        } catch (error) {
-                            console.error(error)
-                            responseMessage = "There are Some Server Error in the StarAI."
-                        }
+                                // here i am sending previous themes of chat contexts if given
 
-                        let status = "success"
+                                extraFeeding.push(
+                                    {
+                                        role: "user",
+                                        "parts": [{ "text": "Now onwards conversation will go on voice mode so keep your responses as small as possible, also if user sometime asks about mode of conversation then tell that it is voice conversation" }]
 
-                        if ("calling" === data.status) {
-                            status = "calling"
+                                    }
+                                )
+                                extraFeeding.push(
+                                    {
+                                        "role": "model",
+                                        "parts": [{ "text": "Ofcourse Sir, I will take care of It Dont Worry." }]
+                                    }
+                                )
+                                extraFeeding.push(
+                                    {
+                                        role: "user",
+                                        "parts": [{ "text": "In each response from now onwards, return the theme or main idea of what the user requested and your reply, wrapped in a clear marker for easy separation from the actual answer strictly. Format is ‹‹Context›› userRequest: <your request>; modelResponse: <your reply> <nextline> then the actual reponse." }]
 
+                                    }
+                                )
+                                extraFeeding.push(
+                                    {
+                                        "role": "model",
+                                        "parts": [{ "text": "Ofcourse Sir, I will take care of It Dont Worry." }]
+                                    }
+                                )
+                            }
+
+                            try {
+                                responseMessage = await requestChatToken(data.message, extraFeeding)
+                                // console.log(responseMessage)
+                            } catch (error) {
+                                console.error(error)
+                                responseMessage = "There are Some Server Error in the StarAI."
+                            }
+
+                            let status = "success"
+
+                            if ("calling" === data.status) {
+                                status = "calling"
+
+                                return socket.send(JSON.stringify(
+                                    {
+                                        status: status,
+                                        sender: StarAI,
+                                        receiver: sender,
+                                        type: "message",
+
+                                        msg: responseMessage
+                                    }
+                                ))
+
+                            }
+
+
+
+                            const yourChatCloudSaveResult = await createNewOneChat(sender.id, StarAI.id, data.message, createdAt)
+
+                            const aiChatCloudSaveResult = await createNewOneChat(StarAI.id, sender.id, responseMessage, createdAt)
+                            if (!aiChatCloudSaveResult || !yourChatCloudSaveResult) {
+
+                                console.error("mongodb database is not storing chats")
+                                responseMessage = "There are Some Server Error in the StarAI."
+                            }
                             return socket.send(JSON.stringify(
                                 {
                                     status: status,
                                     sender: StarAI,
                                     receiver: sender,
                                     type: "message",
-
+                                    createdAt: createdAt,
                                     msg: responseMessage
                                 }
                             ))
@@ -586,24 +696,8 @@ export const newConnectionHandler = async (dbname, httpServer, allowedOrigin) =>
 
 
 
-                        const yourChatCloudSaveResult = await createNewOneChat(sender.id, StarAI.id, data.message, createdAt)
 
-                        const aiChatCloudSaveResult = await createNewOneChat(StarAI.id, sender.id, responseMessage, createdAt)
-                        if (!aiChatCloudSaveResult || !yourChatCloudSaveResult) {
 
-                            console.error("mongodb database is not storing chats")
-                            responseMessage = "There are Some Server Error in the StarAI."
-                        }
-                        return socket.send(JSON.stringify(
-                            {
-                                status: status,
-                                sender: StarAI,
-                                receiver: sender,
-                                type: "message",
-                                createdAt: createdAt,
-                                msg: responseMessage
-                            }
-                        ))
                     }
 
                     if (!userObject || userObject.id !== receiver.id) {
@@ -770,7 +864,8 @@ export const newConnectionHandler = async (dbname, httpServer, allowedOrigin) =>
                             query: "offer",
                             d: data.d,
                             sender: presentSender,
-                            receiver: presentReceiver
+                            receiver: presentReceiver,
+                            ttsTrackId: data?.ttsTrackId
                         }))
 
 
@@ -789,7 +884,8 @@ export const newConnectionHandler = async (dbname, httpServer, allowedOrigin) =>
                             query: "answer",
                             d: data.d,
                             sender: presentSender,
-                            receiver: presentReceiver
+                            receiver: presentReceiver,
+                            ttsTrackId: data?.ttsTrackId
                         }))
 
 

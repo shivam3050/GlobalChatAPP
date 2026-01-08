@@ -54,9 +54,9 @@ function ChatsRoute(props) {
 
     return (
         <aside className="user-vs-chat-container" >
-            <ChatSection userRef={props.userRef} chatRef={props.chatRef} socketContainer={props.socketContainer} refreshChatsFlag={props.refreshChatsFlag} chatsDivRef={props.chatsDivRef} />
+            <ChatSection userRef={props.userRef} chatRef={props.chatRef} socketContainer={props.socketContainer} refreshChatsFlag={props.refreshChatsFlag} chatsDivRef={props.chatsDivRef} textToSpeechContainerRef={props.textToSpeechContainerRef} />
             <form className="formCreateChat" action="" method="post"
-                onSubmit={async(e) => {
+                onSubmit={async (e) => {
 
                     e.preventDefault();
                     const formData = new FormData(e.currentTarget);
@@ -104,7 +104,7 @@ function ChatsRoute(props) {
                         chatTextField.classList.add("isLink")
 
                         const nameSpan = document.createElement("span")
-                       
+
                         nameSpan.textContent = file.name
                         const breaklineTag = document.createElement("br")
                         const sizeSpan = document.createElement("span")
@@ -135,9 +135,9 @@ function ChatsRoute(props) {
 
                         // I WILL UPLOAD USING HTTP INSTEAD OF SOCKET
 
-                        const response = await fetch(`${import.meta.env.VITE_BACKEND_URL}/upload-file`,{
+                        const response = await fetch(`${import.meta.env.VITE_BACKEND_URL}/upload-file`, {
                             method: "POST",
-                            headers:{
+                            headers: {
 
                                 "Content-Type": "application/octet-stream",
                                 "X-Filename": file.name,
@@ -145,7 +145,7 @@ function ChatsRoute(props) {
                                 "X-Sender-Id": props.userRef.current.id,
                                 "X-Receiver-Id": props.userRef.current.focusedContact.id,
                                 "X-Created-At": timestamp
-                            
+
                             },
                             body: file
                         })
@@ -171,14 +171,14 @@ function ChatsRoute(props) {
                         const filename = props.userRef.current.id + "_" + props.userRef.current.focusedContact.id + "_" + timestamp + "_" + file.name;
 
                         props.chatRef.current.filesToBeSent[filename] = file;
-                      
+
 
 
                         // first send metadata
                         // props.socketContainer.current.send(JSON.stringify(metadata));
 
                         attachmentFileRef.current.value = "";
-                        
+
 
                         // inputPartDiv.removeChild(previewFloater)
                         attachmentButton.innerHTML = `
@@ -211,6 +211,15 @@ function ChatsRoute(props) {
                     const chatStatusField = document.createElement("div")
 
                     chatTextField.textContent = message
+
+                    const speakMessage = document.createElement("span")
+                    speakMessage.textContent = "⏵"
+                    // give a class to it
+                    speakMessage.classList.add("hovereffectbtn")
+                    speakMessage.classList.add("playAnyMessageBtn")
+                    speakMessage.onclick = () => props.textToSpeechContainerRef.current.forceSpeakFunction(message)
+
+                    chatTextField.appendChild(speakMessage)
 
                     chatStatusField.textContent = `${localTimeOnly}`
 
@@ -259,7 +268,7 @@ function ChatsRoute(props) {
 
                     </textarea>
                     <button className="attachment" type="button" onClick={(e) => { // this is the file picker trigger button 
-                        
+
                         const previewInstance = attachmentFileRef.current.previewInstance
 
                         previewInstance?.remove();
@@ -280,7 +289,7 @@ function ChatsRoute(props) {
                             <path d="M4.5 3a2.5 2.5 0 0 1 5 0v9a1.5 1.5 0 0 1-3 0V5a.5.5 0 0 1 1 0v7a.5.5 0 0 0 1 0V3a1.5 1.5 0 1 0-3 0v9a2.5 2.5 0 0 0 5 0V5a.5.5 0 0 1 1 0v7a3.5 3.5 0 1 1-7 0z" />
                         </svg>
                     </button>
-                    
+
                     <input ref={attachmentFileRef} style={{ display: "none" }} type="file" name="" onChange={(e) => { // this is actually file picker
                         if (e.currentTarget.files.length > 0) {
 
