@@ -5,7 +5,7 @@ import { useState } from "react";
 import Loading from "../utilitiesCompo/loading";
 import { Outlet, useNavigate } from "react-router-dom";
 import { useRef } from "react";
-import WebRTCQrPage from "./WebRTCQrPage.jsx";
+
 import { speakWithChromeOfflineSynthesizer, startChromeOfflineVoiceRecognition } from "../utilitiesCompo/toolFunctions.js";
 
 
@@ -26,9 +26,7 @@ export function Home(props) {
 
     const [signInErrorLog, setSignInErrorLog] = useState("")
 
-    // for local
 
-    const [localConnectionStatus, setLocalConnectionStatus] = useState(false)
 
 
 
@@ -320,7 +318,7 @@ export function Home(props) {
 
                             if (!stream || !stream.getVideoTracks()[0] || stream.getVideoTracks()[0].readyState !== "live") {
                                 try {
-                                    stream = await navigator.mediaDevices.getUserMedia({ video: true, audio:true });
+                                    stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
                                     props.webRTCContainerRef.current.senderStreamsObject = stream;
                                     console.log("Capturing new stream at receiver");
                                 } catch (err) {
@@ -336,7 +334,7 @@ export function Home(props) {
 
                             props.webRTCContainerRef.current.senderTracksContainerArray = tracksArray;
 
-                            // tracksArray.forEach(track => pc.addTrack(track, stream));
+
 
                             pc.addTrack(stream.getVideoTracks()[0], stream) // video
                             pc.addTrack(stream.getAudioTracks()[0], stream) // audio
@@ -618,11 +616,11 @@ export function Home(props) {
                                     return
 
                                 }
-                                if(event.transceiver.mid === "1") {
+                                if (event.transceiver.mid === "1") {
                                     // first audio main call
                                     return // continue
                                 }
-                                if(event.transceiver.mid === "2") {
+                                if (event.transceiver.mid === "2") {
                                     // tts audio
                                     const audio = document.createElement("audio");
                                     audio.autoplay = true;
@@ -638,6 +636,13 @@ export function Home(props) {
 
                             };
 
+
+
+                            // Reliable (guaranteed delivery, ordered)
+                            // const dataChannel = pc.createDataChannel("myChannel", {
+                            //     ordered: true,   // packets arrive in order
+                            //     maxRetransmits: null // unlimited retries → fully reliable
+                            // });
 
                             pc.ondatachannel = (event) => {
                                 const dc = event.channel;
@@ -666,7 +671,7 @@ export function Home(props) {
                                 }
                             };
 
-                          
+
 
 
                             await pc.setRemoteDescription(data.d);
@@ -681,7 +686,7 @@ export function Home(props) {
                                 receiver: props.userRef.current.focusedContact,
                                 queryType: "answer",
                                 d: answer,
-                             
+
                             }));
 
 
@@ -793,7 +798,7 @@ export function Home(props) {
                             await pc.setRemoteDescription(new RTCSessionDescription(data.d));
                             console.log("Remote description (answer) applied");
 
-                        
+
 
                             // Agar ICE candidates queue me hain, ab unhe add karo
                             if (props.webRTCContainerRef.current.iceQueue?.length) {
@@ -2403,17 +2408,7 @@ export function Home(props) {
         ) : (
 
 
-            props.localuser ? (<WebRTCQrPage
-
-                peerRef={props.peerRef}
-                callerChannelRef={props.callerChannelRef}
-                receiverChannelRef={props.receiverChannelRef}
-                localConnectionStatus={localConnectionStatus}
-                setLocalConnectionStatus={setLocalConnectionStatus}
-                setLocaluser={props.setLocaluser}
-                localuser={props.localuser}
-
-            />) : (
+            
                 <div className="home container-sign-in">
 
 
@@ -2507,19 +2502,7 @@ export function Home(props) {
 
 
                         </form>
-                        <button
-                            style={{ backgroundColor: "var(--professional-blue)", textShadow: "0px 0px 10px white", position: "absolute", borderRadius: "50%", width: "50px", height: "50px", justifyContent: "center", alignItems: "center", top: "0", transform: "translateX(-50%)" }}
-                            onClick={() => {
-
-                                // const formData = new FormData(document.getElementById("register-form"));
-                                // const username = formData.get("username")
-                                props.setLocaluser(prev => !prev)
-                            }}
-                        >
-                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-phone-flip" viewBox="0 0 16 16">
-                                <path fill-rule="evenodd" d="M11 1H5a1 1 0 0 0-1 1v6a.5.5 0 0 1-1 0V2a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v6a.5.5 0 0 1-1 0V2a1 1 0 0 0-1-1m1 13a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-2a.5.5 0 0 0-1 0v2a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2v-2a.5.5 0 0 0-1 0zM1.713 7.954a.5.5 0 1 0-.419-.908c-.347.16-.654.348-.882.57C.184 7.842 0 8.139 0 8.5c0 .546.408.94.823 1.201.44.278 1.043.51 1.745.696C3.978 10.773 5.898 11 8 11q.148 0 .294-.002l-1.148 1.148a.5.5 0 0 0 .708.708l2-2a.5.5 0 0 0 0-.708l-2-2a.5.5 0 1 0-.708.708l1.145 1.144L8 10c-2.04 0-3.87-.221-5.174-.569-.656-.175-1.151-.374-1.47-.575C1.012 8.639 1 8.506 1 8.5c0-.003 0-.059.112-.17.115-.112.31-.242.6-.376Zm12.993-.908a.5.5 0 0 0-.419.908c.292.134.486.264.6.377.113.11.113.166.113.169s0 .065-.13.187c-.132.122-.352.26-.677.4-.645.28-1.596.523-2.763.687a.5.5 0 0 0 .14.99c1.212-.17 2.26-.43 3.02-.758.38-.164.713-.357.96-.587.246-.229.45-.537.45-.919 0-.362-.184-.66-.412-.883s-.535-.411-.882-.571M7.5 2a.5.5 0 0 0 0 1h1a.5.5 0 0 0 0-1z" />
-                            </svg>
-                        </button>
+                        
                     </section>
 
 
@@ -2534,7 +2517,7 @@ export function Home(props) {
 
                     </div>
                 </div>
-            )
+            
 
 
 
