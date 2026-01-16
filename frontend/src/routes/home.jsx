@@ -6,7 +6,7 @@ import Loading from "../utilitiesCompo/loading";
 import { Outlet, useNavigate } from "react-router-dom";
 import { useRef } from "react";
 
-import { speakWithChromeOfflineSynthesizer, startChromeOfflineVoiceRecognition } from "../utilitiesCompo/toolFunctions.js";
+import { startChromeOfflineVoiceRecognition } from "../utilitiesCompo/toolFunctions.js";
 
 
 export function Home(props) {
@@ -1009,7 +1009,8 @@ export function Home(props) {
                                 }
                             }
 
-                            await speakWithChromeOfflineSynthesizer(filteredText)
+                            // await speakWithChromeOfflineSynthesizer(filteredText)
+                            props.textToSpeechContainerRef.current.forceSpeakFunction(filteredText.replace(/\*/g, '').trim())
                             // speaking call again listening function
 
                             await startChromeOfflineVoiceRecognition(props.userRef)
@@ -1411,15 +1412,24 @@ export function Home(props) {
                                 // console.log(filteredText)
 
 
-                                await speakWithChromeOfflineSynthesizer(filteredText)
+                                await props.textToSpeechContainerRef.current.forceSpeakFunction(filteredText)
 
                                 // speaking call again listening function
 
-                                let text = await startChromeOfflineVoiceRecognition(props.userRef)
+                                if (props.webRTCContainerRef.current.recogniserStreamObjectRef && webRTCContainerRef.current.recogniserStreamObjectRef.recogniser) {
+                                    console.error("a recogniser for stt is already running")
+                                    return
+                                }
+                              
 
-                                if (text === "") {
+                                const ok = await startChromeOfflineVoiceRecognition(props.userRef)
+
+                                if (!ok) {
+                                   
                                     return console.error("no text to send")
                                 }
+
+
 
 
                             } catch (error) {
@@ -1431,7 +1441,7 @@ export function Home(props) {
                             if (!props.socketContainer.current || props.socketContainer.current.readyState !== 1) {
                                 console.error("socket is not ready")
                                 props.userRef.current.yourGlobalStarAiReference.isAiCallingOn.flag = false;
-                                buttonEl.style.backgroundColor = "transparent"
+                                // buttonEl.style.backgroundColor = "transparent"
                                 return
                             }
 
@@ -1460,7 +1470,8 @@ export function Home(props) {
 
 
                         if (data.status === "failed" || data.status === "calling" || data.status === "typing") {
-                            console.error("this is failed message by any random or known user who is unfocused")
+                            console.error("this is failed message by any random or known user who is unfocused or this error you may see when not focused and status == calling")
+                            // this error you may see when not focused and status == calling
                             return
                         }
 
@@ -2116,9 +2127,13 @@ export function Home(props) {
 
                 props.userRef.current.yourGlobalStarAiReference.isAiCallingOn.flag = true;
                 buttonEl.style.backgroundColor = "red"
-                props.userRef.current.yourGlobalStarAiReference.isAiCallingOn.instance = await startChromeOfflineVoiceRecognition(props.userRef)
-                // props.userRef.current.yourGlobalStarAiReference.isAiCallingOn.flag = false;
-                // buttonEl.style.backgroundColor = "transparent"
+                const ok = await startChromeOfflineVoiceRecognition(props.userRef)
+                if(!ok){
+                    // buttonEl.style.backgroundColor = "transparent"
+                    return console.error("no text detected.")
+                }
+                //props.userRef.current.yourGlobalStarAiReference.isAiCallingOn.instance = await startChromeOfflineVoiceRecognition(props.userRef)
+               
 
             } catch (error) {
                 console.error("transripter is not working right now", error)
@@ -2408,33 +2423,33 @@ export function Home(props) {
         ) : (
 
 
-            
-                <div className="home container-sign-in">
+
+            <div className="home container-sign-in">
 
 
-                    <section className="signin-box">
-                        <label >Register & Go!</label>
-                        <form id="register-form" autoComplete="off" action="" className="inputs" onSubmit={(e) => {
+                <section className="signin-box">
+                    <label >Register & Go!</label>
+                    <form id="register-form" autoComplete="off" action="" className="inputs" onSubmit={(e) => {
 
-                            initializeConnection(
-                                e,
-                                props.socketContainer,
-                                props.user,
-                                props.setUser,
-                                props.userRef,
-                                props.chatRef
-                            )
+                        initializeConnection(
+                            e,
+                            props.socketContainer,
+                            props.user,
+                            props.setUser,
+                            props.userRef,
+                            props.chatRef
+                        )
 
-                        }}>
+                    }}>
 
-                            <fieldset>
+                        <fieldset>
 
-                                <legend>Username</legend>
-                                <input required type="text" name="username" value={"" + Math.floor(Math.random() * 101)} />
+                            <legend>Username</legend>
+                            <input required type="text" name="username" value={"" + Math.floor(Math.random() * 101)} />
 
-                            </fieldset>
+                        </fieldset>
 
-                            {/* <fieldset>
+                        {/* <fieldset>
 
                             <input required spellCheck={false} type="number" name="age" />
 
@@ -2442,7 +2457,7 @@ export function Home(props) {
 
                         </fieldset> */}
 
-                            {/* <section>
+                        {/* <section>
 
                             <fieldset onClick={(e) => (e.currentTarget.children[0].click())}>
 
@@ -2462,62 +2477,62 @@ export function Home(props) {
 
                         </section> */}
 
-                            <section className="selectbar-container" >
-                                <fieldset >
+                        <section className="selectbar-container" >
+                            <fieldset >
 
-                                    <legend>Country</legend>
-                                    <select className="country-selector-signin" name="country" defaultValue="United States">
-                                        <option style={{ visibility: "hidden" }} value="">{"▼"}</option>
+                                <legend>Country</legend>
+                                <select className="country-selector-signin" name="country" defaultValue="United States">
+                                    <option style={{ visibility: "hidden" }} value="">{"▼"}</option>
 
-                                        {countries.map((country, index) => (
-                                            <option
-                                                key={index} value={country.countryName}>
-                                                {country.countryName}
-                                            </option>
-                                        ))}
+                                    {countries.map((country, index) => (
+                                        <option
+                                            key={index} value={country.countryName}>
+                                            {country.countryName}
+                                        </option>
+                                    ))}
 
-                                    </select>
-
-
-                                </fieldset>
-                            </section>
+                                </select>
 
 
-                            <input type="submit" spellCheck={false} name="submitbtn" value="Go" style={{ backgroundColor: "green" }} />
-
-                            <label
-                                style={
-                                    {
-                                        visibility: "hidden"
-                                    }
-                                }>
-
-                                {signInLoadingFlag ? (<Loading size="20px" />) : (signInErrorLog)}
+                            </fieldset>
+                        </section>
 
 
-                            </label>
+                        <input type="submit" spellCheck={false} name="submitbtn" value="Go" style={{ backgroundColor: "green" }} />
+
+                        <label
+                            style={
+                                {
+                                    visibility: "hidden"
+                                }
+                            }>
+
+                            {signInLoadingFlag ? (<Loading size="20px" />) : (signInErrorLog)}
 
 
+                        </label>
 
 
 
-                        </form>
-                        
-                    </section>
 
 
-                    <div className="container-sign-in-overlay">
+                    </form>
 
-                        <section></section>
-                        <section></section>
-                        <section></section>
-                        <section></section>
-                        <section></section>
+                </section>
 
 
-                    </div>
+                <div className="container-sign-in-overlay">
+
+                    <section></section>
+                    <section></section>
+                    <section></section>
+                    <section></section>
+                    <section></section>
+
+
                 </div>
-            
+            </div>
+
 
 
 
