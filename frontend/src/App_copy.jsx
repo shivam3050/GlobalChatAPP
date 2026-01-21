@@ -216,7 +216,20 @@ function App() {
 
           webRTCContainerRef.current.senderTracksContainerArray = webRTCContainerRef.current.senderStreamsObject.getTracks();
 
-         
+          // webRTCContainerRef.current.senderPC.addTrack(webRTCContainerRef.current.senderStreamsObject.getVideoTracks()[0], webRTCContainerRef.current.senderStreamsObject) // video track sent
+          // webRTCContainerRef.current.senderPC.addTrack(webRTCContainerRef.current.senderStreamsObject.getAudioTracks()[0], webRTCContainerRef.current.senderStreamsObject) // audio track sent
+
+          // below is the tts track initialised
+          const { success, reused } = await textToSpeechContainerRef.current.initAudioCaptureFunction(); // dont fear about init, if it already exists, it will not reinite it will just use the same
+          // by the way here always initilise part will go 
+
+          if (success) {
+            const ttsTrack = await textToSpeechContainerRef.current.outputStream.getAudioTracks()[0];
+            webRTCContainerRef.current.senderPC.addTrack(ttsTrack, textToSpeechContainerRef.current.outputStream)
+            alert("webrtc tts track in succes in app.jsx")
+          } else {
+            alert("tts track is not addedd in app .jsx")
+          }
 
 
         } catch (err) {
@@ -272,7 +285,243 @@ function App() {
             webRTCContainerRef.current.streamElementParentAtSender = parent;
 
 
-          
+            const startVoiceCaptureForSTT = async () => {
+
+              if (webRTCContainerRef.current.recogniserStreamObjectRef && webRTCContainerRef.current.recogniserStreamObjectRef.recogniser) {
+                alert("a recogniser for stt is already running")
+                return false
+              }
+              alert("recogniser is starting to capture voice")
+
+
+
+              const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+              const recogniser = new SpeechRecognition()
+
+              webRTCContainerRef.current.recogniserStreamObjectRef = { recogniser: recogniser, stoppedByUser: false, finalText: "" }
+
+              recogniser.continuous = true;
+              recogniser.interimResults = false;
+
+              recogniser.onresult = (event) => {
+                console.log("on result fired")
+
+
+                const currentFinalPhraseIndex = event.results.length - 1
+
+                console.log(event.results)
+
+                // SpeechRecognitionResultList[
+                //     {
+                //         transcript: "it is again working",
+                //         confidence: 0.8295,
+                //         isFinal: true
+                //     },
+                //     {
+                //         transcript: " started",
+                //         confidence: 0.8869,
+                //         isFinal: true
+                //     },
+                //     {
+                //         transcript: " started",
+                //         confidence: 0.8494,
+                //         isFinal: true
+                //     },
+                //     {
+                //         transcript: " recognise",
+                //         confidence: 0.8359,
+                //         isFinal: true
+                //     }
+                // ]
+
+
+
+                // console.log(event.results[0].isFinal)
+                // console.log(event.results[0][0].transcript)
+
+                if (event.results[currentFinalPhraseIndex].isFinal) { // this check is for api basis
+                  webRTCContainerRef.current.recogniserStreamObjectRef.finalText += " " + event.results[currentFinalPhraseIndex][0].transcript;
+
+                  console.log("Final captured text :  ", webRTCContainerRef.current.recogniserStreamObjectRef.finalText)
+
+                  // if(props.webRTCContainerRef.current.recogniserStreamObject.stoppedByUser){ // user stopped capture button and response came later, this is the condition
+                  webRTCContainerRef.current.recogniserStreamObjectRef.isARequestMadeBySTT = false
+                  // } 
+
+
+
+                } else {
+                  console.log("this was not is isFinal, ignore")
+                  // ignore, due to api basis
+                }
+              }
+              recogniser.onend = () => {
+                if (!webRTCContainerRef.current.recogniserStreamObjectRef.stoppedByUser) {
+
+                  try {
+                    recogniser.start()
+                    webRTCContainerRef.current.recogniserStreamObjectRef.isARequestMadeBySTT = true
+
+                  } catch (error) {
+                    console.log(error)
+                  }
+                }
+
+              }
+              recogniser.onerror = (e) => {
+                console.error("Error:", e.error);
+              };
+              recogniser.onabort = (e) => {
+                webRTCContainerRef.current.recogniserStreamObjectRef.recogniser.stream.getTracks().forEach(track => track.stop());
+                webRTCContainerRef.current.recogniserStreamObjectRef.recogniser.onresult = null
+                webRTCContainerRef.current.recogniserStreamObjectRef.recogniser.onend = null
+                webRTCContainerRef.current.recogniserStreamObjectRef.recogniser.onerror = null
+                webRTCContainerRef.current.recogniserStreamObjectRef.recogniser = null
+                webRTCContainerRef.current.recogniserStreamObjectRef.stoppedByUser = true
+                webRTCContainerRef.current.recogniserStreamObjectRef = null
+              }
+
+
+
+              try {
+                recogniser.start()
+                webRTCContainerRef.current.recogniserStreamObjectRef.isARequestMadeBySTT = true
+                return true
+              } catch (error) {
+                return false
+              }
+
+
+            }
+            button.textContent = "Start STT"
+            //lets have some css
+            // button.style.background = "#16a34a"
+            button.classList.add("hovereffectbtn")
+            button.classList.add("elementOnwhichStartStopSTT")
+
+            const resumeVoiceCapture = (elementOnwhichIsFlagOCapturing) => {
+              if (!webRTCContainerRef.current.recogniserStreamObjectRef?.stoppedByUser) {
+                console.error("not stopped by user, so cannot start")
+                return
+              };
+              try {
+
+                const recogniser = webRTCContainerRef.current.recogniserStreamObjectRef?.recogniser
+                if (!recogniser) {
+                  console.error("recogniser already not exists")
+                  return
+                }
+                recogniser.start();
+                webRTCContainerRef.current.recogniserStreamObjectRef.isARequestMadeBySTT = true
+                webRTCContainerRef.current.recogniserStreamObjectRef.stoppedByUser = false
+
+                elementOnwhichIsFlagOCapturing.textContent = "Stop STT"
+                // elementOnwhichIsFlagOCapturing.style.backgroundColor = "#16a34a"
+                elementOnwhichIsFlagOCapturing.style.boxShadow = "1px 1px 1px 1px green";
+                elementOnwhichIsFlagOCapturing.onclick = () => pauseVoiceCapture(elementOnwhichIsFlagOCapturing)
+
+              } catch (error) {
+                elementOnwhichIsFlagOCapturing.textContent = "Start STT"
+                elementOnwhichIsFlagOCapturing.style.backgroundColor = "#1f2937"
+                elementOnwhichIsFlagOCapturing.style.boxShadow = "1px 1px 1px 1px black";
+                elementOnwhichIsFlagOCapturing.onclick = () => resumeVoiceCapture(elementOnwhichIsFlagOCapturing)
+
+              }
+            }
+            const pauseVoiceCapture = async (elementOnwhichIsFlagOCapturing) => {
+              const recogniser = webRTCContainerRef.current.recogniserStreamObjectRef?.recogniser
+              if (!recogniser) {
+                console.error("recogniser already not exists")
+                return
+              }
+              try {
+                recogniser.stop()
+
+              } catch (error) {
+                console.error(error)
+                return
+              }
+
+              elementOnwhichIsFlagOCapturing.textContent = "Start STT"
+              elementOnwhichIsFlagOCapturing.style.backgroundColor = "#1f2937"
+              elementOnwhichIsFlagOCapturing.style.boxShadow = "1px 1px 1px 1px black";
+              webRTCContainerRef.current.recogniserStreamObjectRef.stoppedByUser = true
+
+              const scannedText = document.createElement("div")
+              // i will add a slight delay
+
+              //polling
+
+              let loopcounter = 0
+              while (webRTCContainerRef.current.recogniserStreamObjectRef.isARequestMadeBySTT) { // this condition will break loop if the onresult last response arrived
+                if (loopcounter >= 50) { break }; // this is terminating hardly after 5 seconds preventing very long polling
+
+                await new Promise((resolve) => { // this way i am reducing the high cpu usage of while loop, and nothing else the use of promise
+                  setTimeout(resolve, 100)
+                  loopcounter++;
+                })
+
+              }
+
+              if (webRTCContainerRef.current.recogniserStreamObjectRef.finalText.length !== 0) {
+
+                //****************** */ OR HERE I HAVE FINALLY THE EXTRACTED TEXT FORM NOW I CAN DO WHATERVER WITH TEXT ***********************
+                // i will send to star ai
+
+                try {
+                  socketContainer.current.send(JSON.stringify({
+                    type: "message",
+                    messageSubType: "triple-text-to-ai",
+                    message: webRTCContainerRef.current.recogniserStreamObjectRef.finalText,
+                    sender: {
+                      username: userRef.current.username,
+                      id: userRef.current.id,
+                      country: userRef.current.country,
+                      customAccessToken: userRef.current.customAccessToken
+                    },
+                    receiver: userRef.current.yourGlobalStarAiReference,
+
+                  }));
+                } catch (err) {
+
+                  console.error("cannot send this triple message", err);
+                }
+
+
+                scannedText.textContent = webRTCContainerRef.current.recogniserStreamObjectRef.finalText
+                parent.appendChild(scannedText) // i am temporary appending in the chatsdiv these messages
+
+
+              }
+
+
+              webRTCContainerRef.current.recogniserStreamObjectRef.finalText = "";
+
+              elementOnwhichIsFlagOCapturing.onclick = () => resumeVoiceCapture(elementOnwhichIsFlagOCapturing)
+
+            }
+
+            button.onclick = async (e) => {
+
+              if (await startVoiceCaptureForSTT()) { // this is starting first time
+
+
+
+                button.onclick = () => pauseVoiceCapture(button)
+                button.textContent = "Stop STT"
+                // button.style.backgroundColor = "#16a34a"
+                button.style.boxShadow = "1px 1px 1px 1px green";
+              } else {
+                button.textContent = "Start STT"
+                button.style.backgroundColor = "#1f2937"
+                button.style.boxShadow = "1px 1px 1px 1px black";
+              }
+
+
+
+
+            }
 
 
 
@@ -292,7 +541,22 @@ function App() {
             return
           }
     
-         
+          if (event.transceiver.mid === "2") {
+            //start playing the small audio
+            // const ttsAudioEl = new Audio();
+            // ttsAudioEl.srcObject = event.streams[0];
+            // ttsAudioEl.autoplay = true;
+            // ttsAudioEl.play().catch(err => console.error("TTS play failed:", err));
+            const audio = document.createElement("audio");
+            audio.autoplay = true;
+            audio.srcObject = new MediaStream([event.track]);
+            audio.muted = false;
+            audio.playsInline = true;
+
+            audio.play();
+            alert("played the small audio successfully")
+            return
+          }
           return
 
         } catch (err) {

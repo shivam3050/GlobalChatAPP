@@ -404,6 +404,25 @@ export function Home(props) {
 
 
 
+// ADD TTS TRACK HERE - BEFORE creating answer
+alert(" Initializing TTS on receiver side...");
+const { success, reused } = await props.textToSpeechContainerRef.current.initAudioCaptureFunction();
+
+if (success) {
+    alert("success from home.jsx init audio capture got success")
+  const ttsTrack = props.textToSpeechContainerRef.current.outputStream.getAudioTracks()[0];
+  if (ttsTrack) {
+    pc.addTrack(ttsTrack, props.textToSpeechContainerRef.current.outputStream);
+    alert("TTS track added from receiver side");
+  } else {
+    alert(" TTS track not available on receiver");
+  }
+} else {
+  alert(" TTS initialization failed on receiver");
+}
+
+
+
 
 
                             pc.ontrack = (event) => {
@@ -449,7 +468,222 @@ el.autoplay = true;
 
                                     const parent = document.getElementById("chats-div"); // THIS NEEDS TO BE CHANGED WHERE YOU WANT TO PUT THIS ELEMENT OF RECEIVER SIDE
 
-                               
+                                    const startVoiceCaptureForSTT = async () => {
+
+                                        if (props.recogniserStreamObjectRef && props.recogniserStreamObjectRef?.current?.recogniser) {
+                                            console.error("a recogniser for stt is already running")
+                                            return false
+                                        }
+
+
+
+                                        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+                                        const recogniser = new SpeechRecognition()
+
+                                        props.recogniserStreamObjectRef.current = { recogniser: recogniser, stoppedByUser: false, finalText: "", isARequestMadeBySTT: false }
+
+                                        recogniser.continuous = true;
+                                        recogniser.interimResults = false;
+
+                                        recogniser.onresult = (event) => {
+                                            console.log("on result fired")
+
+
+                                            const currentFinalPhraseIndex = event.results.length - 1
+
+                                            console.log(event.results)
+
+                                            // SpeechRecognitionResultList[
+                                            //     {
+                                            //         transcript: "it is again working",
+                                            //         confidence: 0.8295,
+                                            //         isFinal: true
+                                            //     },
+                                            //     {
+                                            //         transcript: " started",
+                                            //         confidence: 0.8869,
+                                            //         isFinal: true
+                                            //     },
+                                            //     {
+                                            //         transcript: " started",
+                                            //         confidence: 0.8494,
+                                            //         isFinal: true
+                                            //     },
+                                            //     {
+                                            //         transcript: " recognise",
+                                            //         confidence: 0.8359,
+                                            //         isFinal: true
+                                            //     }
+                                            // ]
+
+
+
+                                            // console.log(event.results[0].isFinal)
+                                            // console.log(event.results[0][0].transcript)
+
+                                            if (event.results[currentFinalPhraseIndex].isFinal) { // this check is for api basis
+                                                props.recogniserStreamObjectRef.current.finalText += " " + event.results[currentFinalPhraseIndex][0].transcript;
+
+                                                console.log("Final captured text :  ", props.recogniserStreamObjectRef.current.finalText)
+
+                                                // if(props.webRTCContainerRef.current.recogniserStreamObject.stoppedByUser){ // user stopped capture button and response came later, this is the condition
+                                                props.recogniserStreamObjectRef.current.isARequestMadeBySTT = false
+                                                // } 
+
+
+
+                                            } else {
+                                                console.log("this was not is isFinal, ignore")
+                                                // ignore, due to api basis
+                                            }
+                                        }
+                                        recogniser.onend = () => {
+                                            if (!props.recogniserStreamObjectRef.current.stoppedByUser) {
+
+                                                try {
+                                                    recogniser.start()
+                                                    props.recogniserStreamObjectRef.current.isARequestMadeBySTT = true
+
+                                                } catch (error) {
+                                                    console.log(error)
+                                                }
+                                            }
+
+                                        }
+                                        recogniser.onerror = (e) => {
+                                            console.error("Error:", e.error);
+                                        };
+                                        recogniser.onabort = (e) => {
+                                            props.recogniserStreamObjectRef.current.recogniser.stream.getTracks().forEach(track => track.stop());
+                                            props.recogniserStreamObjectRef.current.recogniser.onresult = null
+                                            props.recogniserStreamObjectRef.current.recogniser.onend = null
+                                            props.recogniserStreamObjectRef.current.recogniser.onerror = null
+                                            props.recogniserStreamObjectRef.current.recogniser = null
+                                            props.recogniserStreamObjectRef.current.stoppedByUser = true
+                                            props.recogniserStreamObjectRef.current = null
+                                        }
+
+
+
+                                        try {
+                                            recogniser.start()
+                                            props.recogniserStreamObjectRef.current.isARequestMadeBySTT = true
+                                            return true
+                                        } catch (error) {
+                                            return false
+                                        }
+
+
+                                    }
+                                    button.textContent = "Start STT"
+                                    //lets have some css
+                                    // button.style.background = "#16a34a"
+                                    button.classList.add("hovereffectbtn")
+                                    button.classList.add("elementOnwhichStartStopSTT")
+
+                                    const resumeVoiceCapture = (elementOnwhichIsFlagOCapturing) => {
+                                        if (!props.recogniserStreamObjectRef.current?.stoppedByUser) {
+                                            console.error("not stopped by user, so cannot start")
+                                            return
+                                        };
+                                        try {
+
+                                            const recogniser = props.recogniserStreamObjectRef.current?.recogniser
+                                            if (!recogniser) {
+                                                console.error("recogniser already not exists")
+                                                return
+                                            }
+                                            recogniser.start();
+                                            props.recogniserStreamObjectRef.current.isARequestMadeBySTT = true
+                                            props.recogniserStreamObjectRef.current.stoppedByUser = false
+
+                                            elementOnwhichIsFlagOCapturing.textContent = "Stop STT"
+                                            // elementOnwhichIsFlagOCapturing.style.backgroundColor = "#16a34a"
+                                            elementOnwhichIsFlagOCapturing.style.boxShadow = "1px 1px 1px 1px green";
+                                            elementOnwhichIsFlagOCapturing.onclick = () => pauseVoiceCapture(elementOnwhichIsFlagOCapturing)
+
+                                        } catch (error) {
+                                            elementOnwhichIsFlagOCapturing.textContent = "Start STT"
+                                            elementOnwhichIsFlagOCapturing.style.backgroundColor = "#1f2937"
+                                            elementOnwhichIsFlagOCapturing.style.boxShadow = "1px 1px 1px 1px black";
+                                            elementOnwhichIsFlagOCapturing.onclick = () => resumeVoiceCapture(elementOnwhichIsFlagOCapturing)
+
+                                        }
+                                    }
+                                    const pauseVoiceCapture = async (elementOnwhichIsFlagOCapturing) => {
+                                        const recogniser = props.recogniserStreamObjectRef.current?.recogniser
+                                        if (!recogniser) {
+                                            console.error("recogniser already not exists")
+                                            return
+                                        }
+                                        try {
+                                            recogniser.stop()
+
+
+                                        } catch (error) {
+                                            console.error(error)
+                                            return
+                                        }
+
+
+                                        elementOnwhichIsFlagOCapturing.textContent = "Start STT"
+                                        elementOnwhichIsFlagOCapturing.style.backgroundColor = "#1f2937"
+                                        elementOnwhichIsFlagOCapturing.style.boxShadow = "1px 1px 1px 1px black";
+                                        props.recogniserStreamObjectRef.current.stoppedByUser = true
+
+                                        // i will add a slight delay
+
+                                        //polling
+
+                                        let loopcounter = 0
+                                        while (props.recogniserStreamObjectRef.current.isARequestMadeBySTT) { // this condition will break loop if the onresult last response arrived
+                                            if (loopcounter >= 50) { break }; // this is terminating hardly after 5 seconds preventing very long polling
+
+                                            await new Promise((resolve) => { // this way i am reducing the high cpu usage of while loop, and nothing else the use of promise
+                                                setTimeout(resolve, 100)
+                                                loopcounter++;
+                                            })
+
+                                        }
+
+
+                                        if (props.recogniserStreamObjectRef.current.finalText.length !== 0) {
+
+                                            //****************** */ OR HERE I HAVE FINALLY THE EXTRACTED TEXT FORM NOW I CAN DO WHATERVER WITH TEXT ***********************
+
+                                            const scannedText = document.createElement("div")
+                                            scannedText.textContent = props.recogniserStreamObjectRef.current.finalText
+                                            //props.textToSpeechContainerRef.current.forceSpeakFunction(props.recogniserStreamObject.current.finalText)
+                                            parent.appendChild(scannedText) // i am temporary appending in the chatsdiv these messages
+                                        }
+
+                                        props.recogniserStreamObjectRef.current.finalText = "";
+
+                                        elementOnwhichIsFlagOCapturing.onclick = () => resumeVoiceCapture(elementOnwhichIsFlagOCapturing)
+
+                                    }
+
+                                    button.onclick = async (e) => {
+
+                                        if (await startVoiceCaptureForSTT()) { // this is starting first time
+
+
+
+                                            button.onclick = () => pauseVoiceCapture(button)
+                                            button.textContent = "Stop STT"
+                                            // button.style.backgroundColor = "#16a34a"
+                                            button.style.boxShadow = "1px 1px 1px 1px green";
+                                        } else {
+                                            button.textContent = "Start STT"
+                                            button.style.backgroundColor = "#1f2937"
+                                            button.style.boxShadow = "1px 1px 1px 1px black";
+                                        }
+
+
+
+
+                                    }
 
 
                                     props.webRTCContainerRef.current.streamElementParentAtReceiver = parent;
@@ -475,7 +709,18 @@ el.autoplay = true;
                                     // first audio main call
                                     return // continue
                                 }
-                                
+                                if (event.transceiver.mid === "2") {
+                                    // tts audio
+                                    const audio = document.createElement("audio");
+                                    audio.autoplay = true;
+                                    audio.srcObject = new MediaStream([event.track]);
+                                    audio.muted = false;
+                                    audio.playsInline = true;
+
+                                    audio.play();
+                                    alert("played the small audio successfully at receiver side in home.jsx")
+                                    return
+                                }
                                 return
 
                             };
