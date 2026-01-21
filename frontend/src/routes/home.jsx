@@ -375,6 +375,9 @@ if (success) {
                                     el.controls = true;
                                     el.playsInline = true;
                                     el.srcObject = event.streams[0];
+                                    el.muted = true;
+el.playsInline = true;
+el.autoplay = true;
 
                                     const videoDivAndSTTBtnContainer = document.createElement("section")
                                     videoDivAndSTTBtnContainer.style.width = "clamp(100px,80%,400px)";

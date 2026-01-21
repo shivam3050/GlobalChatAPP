@@ -198,6 +198,9 @@ function App() {
             el.muted = event.track.kind === "video";
             el.style.zIndex = "20";
             el.style.borderRadius = "calc(5*var(--med-border-radius))"
+            el.muted = true;
+el.playsInline = true;
+el.autoplay = true;
 
 
 
