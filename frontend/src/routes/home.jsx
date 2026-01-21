@@ -302,218 +302,546 @@ export function Home(props) {
                         return
                     }
 
-                    // ==================== IN home.jsx ====================
+                    if (data.query === "offer") {
+                        try {
 
-// Replace the "offer" query handler in home.jsx with this:
-if (data.query === "offer") {
-  try {
-    if (props.webRTCContainerRef.current.senderPC) {
-      alert("Sorry, already a connection");
-      return;
-    }
+                            if (props.webRTCContainerRef.current.senderPC) {
+                                alert("Sorry, already a connection");
+                                return;
+                            }
+                            alert("a offer came here and new connection from recceiver home.jsx will be set")
 
-    console.log("Offer received, creating peer connection");
 
-    const pc = new RTCPeerConnection({
-      iceServers: [
-        { urls: 'stun:stun.l.google.com:19302' },
-        { urls: 'stun:stun1.l.google.com:19302' }
-      ]
-    });
-    props.webRTCContainerRef.current.senderPC = pc;
+                            const pc = new RTCPeerConnection();
+                            props.webRTCContainerRef.current.senderPC = pc;
 
-    // Get user media
-    let stream;
-    try {
-      stream = await navigator.mediaDevices.getUserMedia({ 
-        video: { 
-          facingMode: 'user',
-          width: { ideal: 1280 },
-          height: { ideal: 720 }
-        }, 
-        audio: {
-          echoCancellation: true,
-          noiseSuppression: true,
-          autoGainControl: true
-        }
-      });
-      props.webRTCContainerRef.current.senderStreamsObject = stream;
-    } catch (err) {
-      alert("Camera/microphone access denied: " + err.message);
-      pc.close();
-      props.webRTCContainerRef.current.senderPC = null;
-      return;
-    }
 
-    // Add tracks
-    stream.getTracks().forEach(track => {
-      pc.addTrack(track, stream);
-    });
+                            let stream = props.webRTCContainerRef.current.senderStreamsObject;
 
-    // Track which streams have been processed
-    if (!props.webRTCContainerRef.current.processedStreams) {
-      props.webRTCContainerRef.current.processedStreams = new Set();
-    }
+                            if (!stream || !stream.getVideoTracks()[0] || stream.getVideoTracks()[0].readyState !== "live") {
+                                try {
+                                    stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+                                    props.webRTCContainerRef.current.senderStreamsObject = stream;
+                                    alert("Capturing new stream audio and video at receiver");
+                                } catch (err) {
+                                    alert("Camera capture unavailable at home.jsx at reciver:", err.name);
+                                    return; // HARD STOP
+                                }
+                            } else {
+                                alert("using the existing camera stream at camera capture at receiver in home.jsx");
+                            }
 
-    // Handle incoming tracks
-    pc.ontrack = (event) => {
-      console.log("Track received at receiver:", event.track.kind);
-      const stream = event.streams[0];
-      const streamId = stream.id;
 
-      // Check if stream has video track
-      const hasVideo = stream.getVideoTracks().length > 0;
+                            const tracksArray = stream.getTracks();
 
-      if (event.track.kind === "video") {
-        if (props.webRTCContainerRef.current.streamElementAtReceiver) {
-          return;
-        }
+                            props.webRTCContainerRef.current.senderTracksContainerArray = tracksArray;
 
-        const video = document.createElement("video");
-        video.srcObject = stream; // Entire stream (includes both video and audio)
-        video.autoplay = true;
-        video.playsInline = true;
-        video.muted = false;
-        video.controls = false;
-        video.style.width = "100%";
-        video.style.borderRadius = "calc(5*var(--med-border-radius))";
 
-        video.play().catch(e => {
-          console.error("Video play error:", e);
-          video.onclick = () => video.play();
-        });
 
-        const container = document.createElement("section");
-        container.style.width = "clamp(100px, 80%, 400px)";
-        container.style.position = "relative";
+                            // pc.addTrack(stream.getVideoTracks()[0], stream) // video
+                            // pc.addTrack(stream.getAudioTracks()[0], stream) // audio
+                            // alert("added both the tracks from receiver from home.jsx")
 
-        const closeBtn = document.createElement("button");
-        closeBtn.textContent = "✖";
-        closeBtn.style.position = "absolute";
-        closeBtn.style.top = "10px";
-        closeBtn.style.right = "10px";
-        closeBtn.style.zIndex = "30";
-        closeBtn.style.backgroundColor = "red";
-        closeBtn.style.color = "white";
-        closeBtn.style.border = "none";
-        closeBtn.style.borderRadius = "50%";
-        closeBtn.style.width = "30px";
-        closeBtn.style.height = "30px";
-        closeBtn.style.cursor = "pointer";
-        closeBtn.onclick = () => {
-          if (props.webRTCContainerRef.current.senderPC) {
-            props.webRTCContainerRef.current.senderPC.close();
-            props.webRTCContainerRef.current.senderPC = null;
-          }
-          if (props.webRTCContainerRef.current.senderStreamsObject) {
-            props.webRTCContainerRef.current.senderStreamsObject.getTracks().forEach(t => t.stop());
-          }
-          container.remove();
-          props.webRTCContainerRef.current.streamElementAtReceiver = null;
-        };
 
-        container.appendChild(video);
-        container.appendChild(closeBtn);
+                            const videoTrack = props.webRTCContainerRef.current.senderStreamsObject.getVideoTracks()[0];
+                            const audioTrack = props.webRTCContainerRef.current.senderStreamsObject.getAudioTracks()[0];
 
-        const parent = document.getElementById("chats-div");
-        if (parent) {
-          parent.appendChild(container);
-          parent.scrollTo({ top: parent.scrollHeight, behavior: 'smooth' });
-        }
+                            if (!videoTrack || !audioTrack) {
+                                throw new Error("Tracks missing from stream");
+                            }
 
-        props.webRTCContainerRef.current.streamElementAtReceiver = container;
-        
-        // Mark this stream as processed
-        props.webRTCContainerRef.current.processedStreams.add(streamId);
-      }
+                            // Step 3: WAIT for tracks to be ready (instead of throwing error)
+                            alert(`Waiting for tracks... Video: ${videoTrack.readyState}, Audio: ${audioTrack.readyState}`);
 
-      // Only create separate audio element if:
-      // 1. It's an audio track AND
-      // 2. The stream has NO video track (standalone audio) AND
-      // 3. We haven't already processed this stream
-      if (event.track.kind === "audio" && 
-          !hasVideo && 
-          !props.webRTCContainerRef.current.processedStreams.has(streamId)) {
-        
-        console.log("Creating standalone audio element");
-        const audio = document.createElement("audio");
-        audio.srcObject = stream;
-        audio.autoplay = true;
-        audio.play().catch(e => console.error("Audio play error:", e));
-        
-        // Mark as processed
-        props.webRTCContainerRef.current.processedStreams.add(streamId);
-      }
-    };
+                            // Wait for video track to be live
+                            if (videoTrack.readyState !== "live") {
+                                await new Promise((resolve) => {
+                                    if (videoTrack.readyState === "live") {
+                                        resolve();
+                                    } else {
+                                        videoTrack.onunmute = () => {
+                                            if (videoTrack.readyState === "live") {
+                                                resolve();
+                                            }
+                                        };
+                                        // Fallback: max 3 seconds wait
+                                        setTimeout(resolve, 3000);
+                                    }
+                                });
+                            }
 
-    // Handle ICE candidates
-    pc.onicecandidate = (e) => {
-      if (e.candidate) {
-        props.socketContainer.current.send(JSON.stringify({
-          type: "query-message",
-          queryType: "ice",
-          sender: props.userRef.current,
-          receiver: props.userRef.current.focusedContact,
-          d: e.candidate
-        }));
-      }
-    };
+                            // Wait for audio track to be live
+                            if (audioTrack.readyState !== "live") {
+                                await new Promise((resolve) => {
+                                    if (audioTrack.readyState === "live") {
+                                        resolve();
+                                    } else {
+                                        audioTrack.onunmute = () => {
+                                            if (audioTrack.readyState === "live") {
+                                                resolve();
+                                            }
+                                        };
+                                        // Fallback: max 3 seconds wait
+                                        setTimeout(resolve, 3000);
+                                    }
+                                });
+                            }
 
-    // Handle connection state
-    pc.onconnectionstatechange = () => {
-      console.log("Connection state:", pc.connectionState);
+                            alert(`Tracks ready now! Video: ${videoTrack.readyState}, Audio: ${audioTrack.readyState}`);
 
-      if (pc.connectionState === "connected") {
-        console.log("WebRTC connected!");
-      }
+                            // Step 4: Store stream
 
-      if (pc.connectionState === "failed" || pc.connectionState === "closed") {
-        if (props.webRTCContainerRef.current.streamElementAtReceiver) {
-          props.webRTCContainerRef.current.streamElementAtReceiver.remove();
-          props.webRTCContainerRef.current.streamElementAtReceiver = null;
-        }
-        if (props.webRTCContainerRef.current.senderStreamsObject) {
-          props.webRTCContainerRef.current.senderStreamsObject.getTracks().forEach(t => t.stop());
-        }
-        pc.close();
-        props.webRTCContainerRef.current.senderPC = null;
-      }
-    };
+                            props.webRTCContainerRef.current.senderTracksContainerArray = props.webRTCContainerRef.current.senderStreamsObject.getTracks();
 
-    // Set remote description and create answer
-    await pc.setRemoteDescription(new RTCSessionDescription(data.d));
-    
-    // Process any queued ICE candidates
-    if (props.webRTCContainerRef.current.iceQueue?.length) {
-      for (const ice of props.webRTCContainerRef.current.iceQueue) {
-        try {
-          await pc.addIceCandidate(new RTCIceCandidate(ice));
-          console.log("Added queued ICE candidate");
-        } catch (e) {
-          console.error("Failed to add queued ICE:", e);
-        }
-      }
-      props.webRTCContainerRef.current.iceQueue = [];
-    }
+                            // Step 5: Add tracks to peer connection
+                            props.webRTCContainerRef.current.senderPC.addTrack(videoTrack, props.webRTCContainerRef.current.senderStreamsObject);
+                            alert("Video track added to PC");
 
-    const answer = await pc.createAnswer();
-    await pc.setLocalDescription(answer);
+                            props.webRTCContainerRef.current.senderPC.addTrack(audioTrack, props.webRTCContainerRef.current.senderStreamsObject);
+                            alert("Audio track added to PC");
 
-    props.socketContainer.current.send(JSON.stringify({
-      type: "query-message",
-      queryType: "answer",
-      sender: props.userRef.current,
-      receiver: props.userRef.current.focusedContact,
-      d: answer
-    }));
+                            props.webRTCContainerRef.current.senderTracksContainerArray = props.webRTCContainerRef.current.senderStreamsObject.getTracks();
 
-  } catch (err) {
-    console.error("Receiver WebRTC setup failed:", err);
-    alert("Failed to establish connection: " + err.message);
-  }
-  return;
-}
 
+
+                            // ADD TTS TRACK HERE - BEFORE creating answer
+                            alert(" Initializing TTS on receiver side...");
+                            const { success, reused } = await props.textToSpeechContainerRef.current.initAudioCaptureFunction();
+
+                            if (success) {
+                                alert("success from home.jsx init audio capture got success")
+                                const ttsTrack = props.textToSpeechContainerRef.current.outputStream.getAudioTracks()[0];
+                                if (ttsTrack) {
+                                    pc.addTrack(ttsTrack, props.textToSpeechContainerRef.current.outputStream);
+                                    alert("TTS track added from receiver side");
+                                } else {
+                                    alert(" TTS track not available on receiver");
+                                }
+                            } else {
+                                alert(" TTS initialization failed on receiver");
+                            }
+
+
+
+
+
+                            pc.ontrack = (event) => {
+                                alert("a track came to receiver side")
+                                alert("see the tracks kind> ", event.track.kind)
+                                if (event.track.kind === "video") {
+                                    //video is coming
+                                    if (props.webRTCContainerRef.current.streamElementAtReceiver?.parentNode) {
+                                        props.webRTCContainerRef.current.streamElementAtReceiver.remove();
+                                    }
+
+                                    const el = document.createElement(event.track.kind);
+                                    el.style.zIndex = "20";
+                                    el.style.width = "100%";
+                                    el.style.borderRadius = "calc(5*var(--med-border-radius))"
+                                    el.autoplay = true;
+                                    el.controls = true;
+                                    el.playsInline = true;
+                                    el.srcObject = event.streams[0];
+                                    el.muted = true;
+                                    el.playsInline = true;
+                                    el.autoplay = true;
+
+                                    const videoDivAndSTTBtnContainer = document.createElement("section")
+                                    videoDivAndSTTBtnContainer.style.width = "clamp(100px,80%,400px)";
+                                    videoDivAndSTTBtnContainer.style.boxShadow = "1px 1px 2px 1px black";
+                                    videoDivAndSTTBtnContainer.style.border = "1px solid black";
+                                    // lets create a voice capturer for speech to text
+                                    const button = document.createElement("button")
+                                    videoDivAndSTTBtnContainer.appendChild(el) // this is the video element
+                                    videoDivAndSTTBtnContainer.appendChild(button) // this is stt button
+
+
+                                    props.webRTCContainerRef.current.streamElementAtReceiver = videoDivAndSTTBtnContainer;
+                                    props.webRTCContainerRef.current.senderTC = event.track;
+
+
+
+
+
+
+
+
+                                    const parent = document.getElementById("chats-div"); // THIS NEEDS TO BE CHANGED WHERE YOU WANT TO PUT THIS ELEMENT OF RECEIVER SIDE
+
+                                    const startVoiceCaptureForSTT = async () => {
+
+                                        if (props.recogniserStreamObjectRef && props.recogniserStreamObjectRef?.current?.recogniser) {
+                                            console.error("a recogniser for stt is already running")
+                                            return false
+                                        }
+
+
+
+                                        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+                                        const recogniser = new SpeechRecognition()
+
+                                        props.recogniserStreamObjectRef.current = { recogniser: recogniser, stoppedByUser: false, finalText: "", isARequestMadeBySTT: false }
+
+                                        recogniser.continuous = true;
+                                        recogniser.interimResults = false;
+
+                                        recogniser.onresult = (event) => {
+                                            console.log("on result fired")
+
+
+                                            const currentFinalPhraseIndex = event.results.length - 1
+
+                                            console.log(event.results)
+
+                                            // SpeechRecognitionResultList[
+                                            //     {
+                                            //         transcript: "it is again working",
+                                            //         confidence: 0.8295,
+                                            //         isFinal: true
+                                            //     },
+                                            //     {
+                                            //         transcript: " started",
+                                            //         confidence: 0.8869,
+                                            //         isFinal: true
+                                            //     },
+                                            //     {
+                                            //         transcript: " started",
+                                            //         confidence: 0.8494,
+                                            //         isFinal: true
+                                            //     },
+                                            //     {
+                                            //         transcript: " recognise",
+                                            //         confidence: 0.8359,
+                                            //         isFinal: true
+                                            //     }
+                                            // ]
+
+
+
+                                            // console.log(event.results[0].isFinal)
+                                            // console.log(event.results[0][0].transcript)
+
+                                            if (event.results[currentFinalPhraseIndex].isFinal) { // this check is for api basis
+                                                props.recogniserStreamObjectRef.current.finalText += " " + event.results[currentFinalPhraseIndex][0].transcript;
+
+                                                console.log("Final captured text :  ", props.recogniserStreamObjectRef.current.finalText)
+
+                                                // if(props.webRTCContainerRef.current.recogniserStreamObject.stoppedByUser){ // user stopped capture button and response came later, this is the condition
+                                                props.recogniserStreamObjectRef.current.isARequestMadeBySTT = false
+                                                // } 
+
+
+
+                                            } else {
+                                                console.log("this was not is isFinal, ignore")
+                                                // ignore, due to api basis
+                                            }
+                                        }
+                                        recogniser.onend = () => {
+                                            if (!props.recogniserStreamObjectRef.current.stoppedByUser) {
+
+                                                try {
+                                                    recogniser.start()
+                                                    props.recogniserStreamObjectRef.current.isARequestMadeBySTT = true
+
+                                                } catch (error) {
+                                                    console.log(error)
+                                                }
+                                            }
+
+                                        }
+                                        recogniser.onerror = (e) => {
+                                            console.error("Error:", e.error);
+                                        };
+                                        recogniser.onabort = (e) => {
+                                            props.recogniserStreamObjectRef.current.recogniser.stream.getTracks().forEach(track => track.stop());
+                                            props.recogniserStreamObjectRef.current.recogniser.onresult = null
+                                            props.recogniserStreamObjectRef.current.recogniser.onend = null
+                                            props.recogniserStreamObjectRef.current.recogniser.onerror = null
+                                            props.recogniserStreamObjectRef.current.recogniser = null
+                                            props.recogniserStreamObjectRef.current.stoppedByUser = true
+                                            props.recogniserStreamObjectRef.current = null
+                                        }
+
+
+
+                                        try {
+                                            recogniser.start()
+                                            props.recogniserStreamObjectRef.current.isARequestMadeBySTT = true
+                                            return true
+                                        } catch (error) {
+                                            return false
+                                        }
+
+
+                                    }
+                                    button.textContent = "Start STT"
+                                    //lets have some css
+                                    // button.style.background = "#16a34a"
+                                    button.classList.add("hovereffectbtn")
+                                    button.classList.add("elementOnwhichStartStopSTT")
+
+                                    const resumeVoiceCapture = (elementOnwhichIsFlagOCapturing) => {
+                                        if (!props.recogniserStreamObjectRef.current?.stoppedByUser) {
+                                            console.error("not stopped by user, so cannot start")
+                                            return
+                                        };
+                                        try {
+
+                                            const recogniser = props.recogniserStreamObjectRef.current?.recogniser
+                                            if (!recogniser) {
+                                                console.error("recogniser already not exists")
+                                                return
+                                            }
+                                            recogniser.start();
+                                            props.recogniserStreamObjectRef.current.isARequestMadeBySTT = true
+                                            props.recogniserStreamObjectRef.current.stoppedByUser = false
+
+                                            elementOnwhichIsFlagOCapturing.textContent = "Stop STT"
+                                            // elementOnwhichIsFlagOCapturing.style.backgroundColor = "#16a34a"
+                                            elementOnwhichIsFlagOCapturing.style.boxShadow = "1px 1px 1px 1px green";
+                                            elementOnwhichIsFlagOCapturing.onclick = () => pauseVoiceCapture(elementOnwhichIsFlagOCapturing)
+
+                                        } catch (error) {
+                                            elementOnwhichIsFlagOCapturing.textContent = "Start STT"
+                                            elementOnwhichIsFlagOCapturing.style.backgroundColor = "#1f2937"
+                                            elementOnwhichIsFlagOCapturing.style.boxShadow = "1px 1px 1px 1px black";
+                                            elementOnwhichIsFlagOCapturing.onclick = () => resumeVoiceCapture(elementOnwhichIsFlagOCapturing)
+
+                                        }
+                                    }
+                                    const pauseVoiceCapture = async (elementOnwhichIsFlagOCapturing) => {
+                                        const recogniser = props.recogniserStreamObjectRef.current?.recogniser
+                                        if (!recogniser) {
+                                            console.error("recogniser already not exists")
+                                            return
+                                        }
+                                        try {
+                                            recogniser.stop()
+
+
+                                        } catch (error) {
+                                            console.error(error)
+                                            return
+                                        }
+
+
+                                        elementOnwhichIsFlagOCapturing.textContent = "Start STT"
+                                        elementOnwhichIsFlagOCapturing.style.backgroundColor = "#1f2937"
+                                        elementOnwhichIsFlagOCapturing.style.boxShadow = "1px 1px 1px 1px black";
+                                        props.recogniserStreamObjectRef.current.stoppedByUser = true
+
+                                        // i will add a slight delay
+
+                                        //polling
+
+                                        let loopcounter = 0
+                                        while (props.recogniserStreamObjectRef.current.isARequestMadeBySTT) { // this condition will break loop if the onresult last response arrived
+                                            if (loopcounter >= 50) { break }; // this is terminating hardly after 5 seconds preventing very long polling
+
+                                            await new Promise((resolve) => { // this way i am reducing the high cpu usage of while loop, and nothing else the use of promise
+                                                setTimeout(resolve, 100)
+                                                loopcounter++;
+                                            })
+
+                                        }
+
+
+                                        if (props.recogniserStreamObjectRef.current.finalText.length !== 0) {
+
+                                            //****************** */ OR HERE I HAVE FINALLY THE EXTRACTED TEXT FORM NOW I CAN DO WHATERVER WITH TEXT ***********************
+
+                                            const scannedText = document.createElement("div")
+                                            scannedText.textContent = props.recogniserStreamObjectRef.current.finalText
+                                            //props.textToSpeechContainerRef.current.forceSpeakFunction(props.recogniserStreamObject.current.finalText)
+                                            parent.appendChild(scannedText) // i am temporary appending in the chatsdiv these messages
+                                        }
+
+                                        props.recogniserStreamObjectRef.current.finalText = "";
+
+                                        elementOnwhichIsFlagOCapturing.onclick = () => resumeVoiceCapture(elementOnwhichIsFlagOCapturing)
+
+                                    }
+
+                                    button.onclick = async (e) => {
+
+                                        if (await startVoiceCaptureForSTT()) { // this is starting first time
+
+
+
+                                            button.onclick = () => pauseVoiceCapture(button)
+                                            button.textContent = "Stop STT"
+                                            // button.style.backgroundColor = "#16a34a"
+                                            button.style.boxShadow = "1px 1px 1px 1px green";
+                                        } else {
+                                            button.textContent = "Start STT"
+                                            button.style.backgroundColor = "#1f2937"
+                                            button.style.boxShadow = "1px 1px 1px 1px black";
+                                        }
+
+
+
+
+                                    }
+
+
+                                    props.webRTCContainerRef.current.streamElementParentAtReceiver = parent;
+
+                                    if (parent) {
+
+                                        parent.appendChild(videoDivAndSTTBtnContainer);
+
+
+
+                                    };
+
+                                    // Track state logs
+                                    event.track.onmute = () => console.log("Track muted");
+                                    event.track.onunmute = () => console.log("Track unmuted");
+
+                                    setTimeout(() => el.play().catch(err => console.error("Playback failed:", err)), 100);
+
+                                    return
+
+                                }
+                                // if (event.transceiver.mid === "1") {
+                                //     // first audio main call
+                                //     return // continue
+                                // }
+                                // if (event.transceiver.mid === "2") {
+                                //     // tts audio
+                                //     const audio = document.createElement("audio");
+                                //     audio.autoplay = true;
+                                //     audio.srcObject = new MediaStream([event.track]);
+                                //     audio.muted = false;
+                                //     audio.playsInline = true;
+
+                                //     audio.play();
+                                //     alert("played the small audio successfully at receiver side in home.jsx")
+                                //     return
+                                // }
+                                return
+
+                            };
+
+
+
+                            // Reliable (guaranteed delivery, ordered)
+                            // const dataChannel = pc.createDataChannel("myChannel", {
+                            //     ordered: true,   // packets arrive in order
+                            //     maxRetransmits: null // unlimited retries → fully reliable
+                            // });
+
+                            pc.ondatachannel = (event) => {
+                                const dc = event.channel;
+                                props.webRTCContainerRef.current.senderDC = dc;
+
+                                dc.onopen = () => {
+                                    console.log("Data channel open (receiver)");
+                                    dc.send("Hello back Sir");
+                                };
+                                dc.onmessage = e => { console.log("Message from sender:", e.data); alert(e.data); };
+                                dc.onerror = err => console.error("DataChannel error:", err);
+                            };
+
+
+                            pc.onicecandidate = (e) => {
+                                if (e.candidate) {
+                                    try {
+                                        props.socketContainer.current.send(JSON.stringify({
+                                            type: "query-message",
+                                            queryType: "ice",
+                                            sender: { username: props.userRef.current.username, id: props.userRef.current.id, country: props.userRef.current.country, customAccessToken: props.userRef.current.customAccessToken },
+                                            receiver: props.userRef.current.focusedContact,
+                                            d: e.candidate
+                                        }));
+                                    } catch (err) { console.error("Failed to send ICE candidate:", err); }
+                                }
+                            };
+
+
+
+
+                            await pc.setRemoteDescription(data.d);
+                            const answer = await pc.createAnswer();
+                            await pc.setLocalDescription(answer);
+
+
+
+                            props.socketContainer.current.send(JSON.stringify({
+                                type: "query-message",
+                                sender: { username: props.userRef.current.username, id: props.userRef.current.id, country: props.userRef.current.country, customAccessToken: props.userRef.current.customAccessToken },
+                                receiver: props.userRef.current.focusedContact,
+                                queryType: "answer",
+                                d: answer,
+
+                            }));
+
+
+                            pc.onconnectionstatechange = () => {
+                                const state = pc.connectionState;
+                                console.log("Connection state:", state);
+
+                                const cleanup = () => {
+                                    // Track cleanup
+                                    props.textToSpeechContainerRef.current.cleanUp()
+
+                                    if (props.webRTCContainerRef.current.senderTC) {
+                                        props.webRTCContainerRef.current.senderTC.stop();
+                                        const el = props.webRTCContainerRef.current.streamElementAtReceiver;
+                                        const parent = props.webRTCContainerRef.current.streamElementParentAtReceiver;
+                                        if (el && parent && parent.contains(el)) parent.removeChild(el);
+                                        props.webRTCContainerRef.current.streamElementAtReceiver = null;
+                                        props.webRTCContainerRef.current.senderTC = null;
+                                        console.log("Track cleaned up");
+                                    }
+
+                                    // Data channel cleanup
+                                    if (props.webRTCContainerRef.current.senderDC) {
+                                        props.webRTCContainerRef.current.senderDC.close();
+                                        props.webRTCContainerRef.current.senderDC = null;
+                                        console.log("Data channel closed");
+                                    }
+
+                                    // Peer connection cleanup
+                                    if (props.webRTCContainerRef.current.senderPC) {
+                                        props.webRTCContainerRef.current.senderPC.getSenders().forEach(sender => { if (sender.track) { sender.track.stop(); pc.removeTrack(sender); } });
+                                        props.webRTCContainerRef.current.senderPC.close();
+                                        props.webRTCContainerRef.current.senderPC = null;
+                                        console.log("Peer connection closed");
+                                    }
+
+                                    // Reset button
+                                    props.rtcbuttonRef.current.style.backgroundColor = "transparent";
+                                    props.rtcbuttonRef.current.onclick = () => {
+                                        props.webRTCContainerRef.current.webRTCStartFunction("mediastream");
+                                    };
+
+
+                                };
+
+                                if (state === "connected") {
+                                    console.log("✅ Peer connection SUCCESS!");
+                                    props.rtcbuttonRef.current.style.backgroundColor = "red";
+
+                                    props.rtcbuttonRef.current.onclick = (e) => {
+                                        e.stopPropagation();
+                                        cleanup();
+                                    };
+                                }
+
+                                if (state === "failed" || state === "closed") {
+                                    console.log("Connection failed/closed");
+                                    cleanup();
+                                }
+                            };
+
+                        } catch (err) {
+                            console.error("Receiver WebRTC setup failed:", err);
+                        }
+                        return;
+                    }
 
                     if (data.query === "ice") {
                         const pc = props.webRTCContainerRef.current.senderPC;
@@ -1181,12 +1509,12 @@ if (data.query === "offer") {
                                     console.error("a recogniser for stt is already running")
                                     return
                                 }
-                              
+
 
                                 const ok = await startChromeOfflineVoiceRecognition(props.userRef)
 
                                 if (!ok) {
-                                   
+
                                     return console.error("no text to send")
                                 }
 
@@ -1889,12 +2217,12 @@ if (data.query === "offer") {
                 props.userRef.current.yourGlobalStarAiReference.isAiCallingOn.flag = true;
                 buttonEl.style.backgroundColor = "red"
                 const ok = await startChromeOfflineVoiceRecognition(props.userRef)
-                if(!ok){
+                if (!ok) {
                     // buttonEl.style.backgroundColor = "transparent"
                     return console.error("no text detected.")
                 }
                 //props.userRef.current.yourGlobalStarAiReference.isAiCallingOn.instance = await startChromeOfflineVoiceRecognition(props.userRef)
-               
+
 
             } catch (error) {
                 console.error("transripter is not working right now", error)

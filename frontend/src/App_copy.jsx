@@ -164,46 +164,8 @@ function App() {
             throw new Error("Tracks missing from stream");
         }
         
-        // Step 3: WAIT for tracks to be ready (instead of throwing error)
-        alert(`Waiting for tracks... Video: ${videoTrack.readyState}, Audio: ${audioTrack.readyState}`);
         
-        // Wait for video track to be live
-        if (videoTrack.readyState !== "live") {
-            await new Promise((resolve) => {
-                if (videoTrack.readyState === "live") {
-                    resolve();
-                } else {
-                    videoTrack.onunmute = () => {
-                        if (videoTrack.readyState === "live") {
-                            resolve();
-                        }
-                    };
-                    // Fallback: max 3 seconds wait
-                    setTimeout(resolve, 3000);
-                }
-            });
-        }
-        
-        // Wait for audio track to be live
-        if (audioTrack.readyState !== "live") {
-            await new Promise((resolve) => {
-                if (audioTrack.readyState === "live") {
-                    resolve();
-                } else {
-                    audioTrack.onunmute = () => {
-                        if (audioTrack.readyState === "live") {
-                            resolve();
-                        }
-                    };
-                    // Fallback: max 3 seconds wait
-                    setTimeout(resolve, 3000);
-                }
-            });
-        }
-        
-        alert(`Tracks ready now! Video: ${videoTrack.readyState}, Audio: ${audioTrack.readyState}`);
-        
-        // Step 4: Store stream
+       
     
         webRTCContainerRef.current.senderTracksContainerArray = webRTCContainerRef.current.senderStreamsObject.getTracks();
         
@@ -215,9 +177,6 @@ function App() {
         alert("Audio track added to PC");
 
           webRTCContainerRef.current.senderTracksContainerArray = webRTCContainerRef.current.senderStreamsObject.getTracks();
-
-          // webRTCContainerRef.current.senderPC.addTrack(webRTCContainerRef.current.senderStreamsObject.getVideoTracks()[0], webRTCContainerRef.current.senderStreamsObject) // video track sent
-          // webRTCContainerRef.current.senderPC.addTrack(webRTCContainerRef.current.senderStreamsObject.getAudioTracks()[0], webRTCContainerRef.current.senderStreamsObject) // audio track sent
 
           // below is the tts track initialised
           const { success, reused } = await textToSpeechContainerRef.current.initAudioCaptureFunction(); // dont fear about init, if it already exists, it will not reinite it will just use the same
