@@ -118,7 +118,7 @@ function App() {
       // Check WebSocket readiness
       if (!socketContainer.current || socketContainer.current.readyState !== 1) {
         // alert("WebSocket not ready");
-        console.error("WebSocket not ready");
+        alert("WebSocket not ready");
         return;
       }
 
@@ -126,7 +126,7 @@ function App() {
       if (webRTCContainerRef.current.senderPC) {
         if (webRTCContainerRef.current.senderPC.connectionState === "connected") {
           // alert("A connection already exists, close it first.");
-          console.error("A connection already exists, close it first.");
+          alert("A connection already exists, close it first.");
           return;
         }
         try {
@@ -167,7 +167,7 @@ function App() {
             webRTCContainerRef.current.senderPC.addTrack(ttsTrack, textToSpeechContainerRef.current.outputStream)
    
           } else {
-            console.log("tts track is not addedd")
+            alert("tts track is not addedd")
           }
 
 
@@ -178,7 +178,7 @@ function App() {
         }
       } else {
         webRTCContainerRef.current.senderDC = webRTCContainerRef.current.senderPC.createDataChannel("text");
-        console.log("No motive provided, creating default text DataChannel");
+        alert("No motive provided, creating default text DataChannel");
       }
 
       // RECEIVER TRACK HANDLER
@@ -223,7 +223,7 @@ function App() {
             const startVoiceCaptureForSTT = async () => {
 
               if (webRTCContainerRef.current.recogniserStreamObjectRef && webRTCContainerRef.current.recogniserStreamObjectRef.recogniser) {
-                console.error("a recogniser for stt is already running")
+                alert("a recogniser for stt is already running")
                 return false
               }
 
@@ -465,7 +465,7 @@ function App() {
 
             };
 
-            console.log("Receiver track added to sender side element");
+            alert("Receiver track added to sender side element");
             return
           }
 
@@ -488,30 +488,30 @@ function App() {
             audio.playsInline = true;
 
             audio.play();
-            console.log("played the small audio successfully")
+            alert("played the small audio successfully")
             return
           }
           return
 
         } catch (err) {
           // alert("Error handling incoming track: " + err.message);
-          console.error("Error handling incoming track:", err);
+          alert("Error handling incoming track:", err);
         }
       };
 
       // DATA CHANNEL HANDLER
       if (webRTCContainerRef.current.senderDC) {
         webRTCContainerRef.current.senderDC.onopen = () => {
-          console.log("Data channel open");
+          alert("Data channel open");
           try { webRTCContainerRef.current.senderDC.send("Hello Sir"); } catch (err) { alert("Failed to send message: " + err.message); }
         };
         webRTCContainerRef.current.senderDC.onmessage = (e) => {
-          console.log("Message from receiver:", e.data);
+          alert("Message from receiver:", e.data);
           // alert(e.data);
         };
         webRTCContainerRef.current.senderDC.onerror = (err) => {
           // alert("Data channel error: " + err.message);
-          console.error("Data channel error:", err);
+          alert("Data channel error:", err);
         };
       }
 
@@ -533,7 +533,7 @@ function App() {
             }));
           } catch (err) {
             // alert("Failed to send ICE candidate: " + err.message);
-            console.error("Failed to send ICE candidate:", err);
+            alert("Failed to send ICE candidate:", err);
           }
         }
       };
@@ -561,7 +561,7 @@ function App() {
         }));
       } catch (err) {
         // alert("Failed to create/send offer: " + err.message);
-        console.error("Failed to create/send offer:", err);
+        alert("Failed to create/send offer:", err);
         return;
       }
 
@@ -592,14 +592,14 @@ function App() {
         }
         if (pc.connectionState === "failed" || pc.connectionState === "closed") {
           // alert("Connection failed/closed");
-          console.log("Connection failed/closed, cleaning up");
+          alert("Connection failed/closed, cleaning up");
           cleanup();
         }
       };
 
     } catch (err) {
       // alert("WebRTC setup failed: " + err.message);
-      console.error("WebRTC setup failed:", err);
+      alert("WebRTC setup failed:", err);
     }
   };
 
