@@ -157,8 +157,8 @@ function App() {
           webRTCContainerRef.current.senderStreamsObject = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
 
           // Step 2: Get tracks
-        const videoTrack = stream.getVideoTracks()[0];
-        const audioTrack = stream.getAudioTracks()[0];
+        const videoTrack = webRTCContainerRef.current.senderStreamsObject.getVideoTracks()[0];
+        const audioTrack = webRTCContainerRef.current.senderStreamsObject.getAudioTracks()[0];
         
         if (!videoTrack || !audioTrack) {
             throw new Error("Tracks missing from stream");
@@ -204,14 +204,14 @@ function App() {
         alert(`Tracks ready now! Video: ${videoTrack.readyState}, Audio: ${audioTrack.readyState}`);
         
         // Step 4: Store stream
-        webRTCContainerRef.current.senderStreamsObject = stream;
-        webRTCContainerRef.current.senderTracksContainerArray = stream.getTracks();
+    
+        webRTCContainerRef.current.senderTracksContainerArray = webRTCContainerRef.current.senderStreamsObject.getTracks();
         
         // Step 5: Add tracks to peer connection
-        webRTCContainerRef.current.senderPC.addTrack(videoTrack, stream);
+        webRTCContainerRef.current.senderPC.addTrack(videoTrack, webRTCContainerRef.current.senderStreamsObject);
         alert("Video track added to PC");
         
-        webRTCContainerRef.current.senderPC.addTrack(audioTrack, stream);
+        webRTCContainerRef.current.senderPC.addTrack(audioTrack, webRTCContainerRef.current.senderStreamsObject);
         alert("Audio track added to PC");
 
           webRTCContainerRef.current.senderTracksContainerArray = webRTCContainerRef.current.senderStreamsObject.getTracks();
