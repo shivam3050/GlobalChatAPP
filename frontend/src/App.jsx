@@ -163,7 +163,7 @@ function App() {
           // by the way here always initilise part will go 
 
           if (success) {
-            const ttsTrack = textToSpeechContainerRef.current.outputStream.getAudioTracks()[0];
+            const ttsTrack = await textToSpeechContainerRef.current.outputStream.getAudioTracks()[0];
             webRTCContainerRef.current.senderPC.addTrack(ttsTrack, textToSpeechContainerRef.current.outputStream)
    
           } else {

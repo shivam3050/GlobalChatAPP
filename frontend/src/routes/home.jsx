@@ -340,6 +340,24 @@ export function Home(props) {
                             pc.addTrack(stream.getAudioTracks()[0], stream) // audio
 
 
+// ADD TTS TRACK HERE - BEFORE creating answer
+console.log("🔊 Initializing TTS on receiver side...");
+const { success, reused } = await props.textToSpeechContainerRef.current.initAudioCaptureFunction();
+
+if (success) {
+  const ttsTrack = props.textToSpeechContainerRef.current.outputStream.getAudioTracks()[0];
+  if (ttsTrack) {
+    pc.addTrack(ttsTrack, props.textToSpeechContainerRef.current.outputStream);
+    console.log("✅ TTS track added on receiver side");
+  } else {
+    console.warn("⚠️ TTS track not available on receiver");
+  }
+} else {
+  console.log("⚠️ TTS initialization failed on receiver");
+}
+
+
+
 
 
                             pc.ontrack = (event) => {
@@ -355,6 +373,7 @@ export function Home(props) {
                                     el.style.borderRadius = "calc(5*var(--med-border-radius))"
                                     el.autoplay = true;
                                     el.controls = true;
+                                    el.playsInline = true;
                                     el.srcObject = event.streams[0];
 
                                     const videoDivAndSTTBtnContainer = document.createElement("section")
