@@ -419,13 +419,12 @@ export function Home(props) {
                                     el.style.zIndex = "20";
                                     el.style.width = "100%";
                                     el.style.borderRadius = "calc(5*var(--med-border-radius))"
-                                    el.autoplay = true;
+                                   
                                     el.controls = true;
                                     el.playsInline = true;
                                     el.srcObject = event.streams[0];
                                     el.muted = true;
-el.playsInline = true;
-el.autoplay = true;
+
 
                                     const videoDivAndSTTBtnContainer = document.createElement("section")
                                     videoDivAndSTTBtnContainer.style.width = "clamp(100px,80%,400px)";

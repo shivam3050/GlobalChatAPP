@@ -242,14 +242,14 @@ function App() {
 
             const el = document.createElement(event.track.kind === "video" ? "video" : "audio");
             el.srcObject = event.streams[0];
-            el.autoplay = true;
+            
             el.controls = true;
-            el.muted = event.track.kind === "video";
+           
             el.style.zIndex = "20";
             el.style.borderRadius = "calc(5*var(--med-border-radius))"
             el.muted = true;
             el.playsInline = true;
-            el.autoplay = true;
+           
 
 
 
@@ -342,9 +342,7 @@ function App() {
 
       // CREATE AND SEND OFFER
       try {
-        // below is the tts track initialised
-        const { success, reused } = await textToSpeechContainerRef.current.initAudioCaptureFunction(); // dont fear about init, if it already exists, it will not reinite it will just use the same
-        // by the way here always initilise part will go 
+       
     
         const offer = await webRTCContainerRef.current.senderPC.createOffer();
         await webRTCContainerRef.current.senderPC.setLocalDescription(offer);
