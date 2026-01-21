@@ -350,19 +350,9 @@ if (data.query === "offer") {
       pc.addTrack(track, stream);
     });
 
-    // Track which streams have been processed
-    if (!props.webRTCContainerRef.current.processedStreams) {
-      props.webRTCContainerRef.current.processedStreams = new Set();
-    }
-
     // Handle incoming tracks
     pc.ontrack = (event) => {
       console.log("Track received at receiver:", event.track.kind);
-      const stream = event.streams[0];
-      const streamId = stream.id;
-
-      // Check if stream has video track
-      const hasVideo = stream.getVideoTracks().length > 0;
 
       if (event.track.kind === "video") {
         if (props.webRTCContainerRef.current.streamElementAtReceiver) {
@@ -370,7 +360,7 @@ if (data.query === "offer") {
         }
 
         const video = document.createElement("video");
-        video.srcObject = stream; // Entire stream (includes both video and audio)
+        video.srcObject = event.streams[0];
         video.autoplay = true;
         video.playsInline = true;
         video.muted = false;
@@ -422,27 +412,13 @@ if (data.query === "offer") {
         }
 
         props.webRTCContainerRef.current.streamElementAtReceiver = container;
-        
-        // Mark this stream as processed
-        props.webRTCContainerRef.current.processedStreams.add(streamId);
       }
 
-      // Only create separate audio element if:
-      // 1. It's an audio track AND
-      // 2. The stream has NO video track (standalone audio) AND
-      // 3. We haven't already processed this stream
-      if (event.track.kind === "audio" && 
-          !hasVideo && 
-          !props.webRTCContainerRef.current.processedStreams.has(streamId)) {
-        
-        console.log("Creating standalone audio element");
+      if (event.track.kind === "audio") {
         const audio = document.createElement("audio");
-        audio.srcObject = stream;
+        audio.srcObject = event.streams[0];
         audio.autoplay = true;
         audio.play().catch(e => console.error("Audio play error:", e));
-        
-        // Mark as processed
-        props.webRTCContainerRef.current.processedStreams.add(streamId);
       }
     };
 

@@ -112,10 +112,9 @@ function App() {
 
 
 
+// ==================== IN App.jsx ====================
 
-  // ==================== IN App.jsx ====================
-
-
+// Replace the webRTCStartFunction in App.jsx with this:
 webRTCContainerRef.current.webRTCStartFunction = async (motive = null) => {
   try {
     if (!socketContainer.current || socketContainer.current.readyState !== 1) {
@@ -191,20 +190,10 @@ webRTCContainerRef.current.webRTCStartFunction = async (motive = null) => {
       }
     }
 
-    // Track which streams have been processed
-    if (!webRTCContainerRef.current.processedStreams) {
-      webRTCContainerRef.current.processedStreams = new Set();
-    }
-
     // Handle incoming tracks
     pc.ontrack = (event) => {
       console.log("Track received:", event.track.kind);
-      const stream = event.streams[0];
-      const streamId = stream.id;
 
-      // Check if stream has video track
-      const hasVideo = stream.getVideoTracks().length > 0;
-      
       if (event.track.kind === "video") {
         // Prevent duplicate video elements
         if (webRTCContainerRef.current.streamElementAtSender) {
@@ -212,7 +201,7 @@ webRTCContainerRef.current.webRTCStartFunction = async (motive = null) => {
         }
 
         const video = document.createElement("video");
-        video.srcObject = stream; // Entire stream (includes both video and audio)
+        video.srcObject = event.streams[0];
         video.autoplay = true;
         video.playsInline = true;
         video.muted = false;
@@ -223,6 +212,7 @@ webRTCContainerRef.current.webRTCStartFunction = async (motive = null) => {
         // Play video with error handling
         video.play().catch(e => {
           console.error("Video play error:", e);
+          // Retry on user interaction
           video.onclick = () => video.play();
         });
 
@@ -266,27 +256,13 @@ webRTCContainerRef.current.webRTCStartFunction = async (motive = null) => {
         }
 
         webRTCContainerRef.current.streamElementAtSender = container;
-        
-        // Mark this stream as processed (so we don't create separate audio element)
-        webRTCContainerRef.current.processedStreams.add(streamId);
       }
 
-      // Only create separate audio element if:
-      // 1. It's an audio track AND
-      // 2. The stream has NO video track (standalone audio) AND
-      // 3. We haven't already processed this stream
-      if (event.track.kind === "audio" && 
-          !hasVideo && 
-          !webRTCContainerRef.current.processedStreams.has(streamId)) {
-        
-        console.log("Creating standalone audio element");
+      if (event.track.kind === "audio") {
         const audio = document.createElement("audio");
-        audio.srcObject = stream;
+        audio.srcObject = event.streams[0];
         audio.autoplay = true;
         audio.play().catch(e => console.error("Audio play error:", e));
-        
-        // Mark as processed
-        webRTCContainerRef.current.processedStreams.add(streamId);
       }
     };
 
