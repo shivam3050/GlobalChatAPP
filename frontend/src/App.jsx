@@ -142,6 +142,7 @@ function App() {
       // Create new RTCPeerConnection
       webRTCContainerRef.current.senderPC = new RTCPeerConnection();
       webRTCContainerRef.current.senderDC = null;
+      alert("webrtc new connecion is starting sfrom here")
 
       // Create DataChannel or MediaStream depending on motive
       if (motive === "text") {
@@ -151,6 +152,7 @@ function App() {
       } else if (motive === "json") {
         webRTCContainerRef.current.senderDC = webRTCContainerRef.current.senderPC.createDataChannel("json");
       } else if (motive === "mediastream") {
+        alert("webrtc media stream motive chosen")
         try {
           webRTCContainerRef.current.senderStreamsObject = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
           webRTCContainerRef.current.senderTracksContainerArray = webRTCContainerRef.current.senderStreamsObject.getTracks();
@@ -165,14 +167,14 @@ function App() {
           if (success) {
             const ttsTrack = await textToSpeechContainerRef.current.outputStream.getAudioTracks()[0];
             webRTCContainerRef.current.senderPC.addTrack(ttsTrack, textToSpeechContainerRef.current.outputStream)
-   
+            alert("webrtc tts track in succes in app.jsx")
           } else {
-            alert("tts track is not addedd")
+            alert("tts track is not addedd in app .jsx")
           }
 
 
         } catch (err) {
-          alert("Some error in setting media stream: " + err.name);
+          alert("Some error in setting media stream(in app.jsx): " + err.name);
           console.error("Some error in setting media stream:", err);
           return;
         }
@@ -184,6 +186,7 @@ function App() {
       // RECEIVER TRACK HANDLER
       webRTCContainerRef.current.senderPC.ontrack = (event) => {
         try {
+          alert("a track came from receiver now see this in app.jsx kind> ",event.track.kind)
 
           if (event.transceiver.mid === "0") {
             // video
@@ -199,8 +202,8 @@ function App() {
             el.style.zIndex = "20";
             el.style.borderRadius = "calc(5*var(--med-border-radius))"
             el.muted = true;
-el.playsInline = true;
-el.autoplay = true;
+            el.playsInline = true;
+            el.autoplay = true;
 
 
 
@@ -229,6 +232,7 @@ el.autoplay = true;
                 alert("a recogniser for stt is already running")
                 return false
               }
+              alert("recogniser is starting to capture voice")
 
 
 

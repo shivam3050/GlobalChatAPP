@@ -95,6 +95,7 @@ export function Home(props) {
             setSignInLoadingFlag(false)
             setSignInErrorLog("unknown error")
             console.error(error)
+            alert("socket is absent in home.jsx")
             return
         }
 
@@ -305,9 +306,10 @@ export function Home(props) {
                         try {
 
                             if (props.webRTCContainerRef.current.senderPC) {
-                                console.error("Sorry, already a connection");
+                                alert("Sorry, already a connection");
                                 return;
                             }
+                            alert("a offer came here and new connection from recceiver home.jsx will be set")
 
 
                             const pc = new RTCPeerConnection();
@@ -320,13 +322,13 @@ export function Home(props) {
                                 try {
                                     stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
                                     props.webRTCContainerRef.current.senderStreamsObject = stream;
-                                    console.log("Capturing new stream at receiver");
+                                    alert("Capturing new stream audio and video at receiver");
                                 } catch (err) {
-                                    console.error("Camera unavailable:", err.name);
+                                    alert("Camera capture unavailable at home.jsx at reciver:", err.name);
                                     return; // HARD STOP
                                 }
                             } else {
-                                console.log("using the existing camera stream");
+                                alert("using the existing camera stream at camera capture at receiver in home.jsx");
                             }
 
 
@@ -338,22 +340,24 @@ export function Home(props) {
 
                             pc.addTrack(stream.getVideoTracks()[0], stream) // video
                             pc.addTrack(stream.getAudioTracks()[0], stream) // audio
+                            alert("added both the tracks from receiver from home.jsx")
 
 
 // ADD TTS TRACK HERE - BEFORE creating answer
-console.log("🔊 Initializing TTS on receiver side...");
+alert(" Initializing TTS on receiver side...");
 const { success, reused } = await props.textToSpeechContainerRef.current.initAudioCaptureFunction();
 
 if (success) {
+    alert("success from home.jsx init audio capture got success")
   const ttsTrack = props.textToSpeechContainerRef.current.outputStream.getAudioTracks()[0];
   if (ttsTrack) {
     pc.addTrack(ttsTrack, props.textToSpeechContainerRef.current.outputStream);
-    console.log("✅ TTS track added on receiver side");
+    alert("TTS track added from receiver side");
   } else {
-    console.warn("⚠️ TTS track not available on receiver");
+    alert(" TTS track not available on receiver");
   }
 } else {
-  console.log("⚠️ TTS initialization failed on receiver");
+  alert(" TTS initialization failed on receiver");
 }
 
 
@@ -361,6 +365,8 @@ if (success) {
 
 
                             pc.ontrack = (event) => {
+                                alert("a track came to receiver side")
+                                alert("see the tracks kind> ",event.track.kind)
                                 if (event.transceiver.mid === "0") {
                                     //video is coming
                                     if (props.webRTCContainerRef.current.streamElementAtReceiver?.parentNode) {
@@ -651,7 +657,7 @@ el.autoplay = true;
                                     audio.playsInline = true;
 
                                     audio.play();
-                                    console.log("played the small audio successfully")
+                                    alert("played the small audio successfully at receiver side in home.jsx")
                                     return
                                 }
                                 return
