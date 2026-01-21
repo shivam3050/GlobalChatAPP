@@ -338,9 +338,70 @@ export function Home(props) {
 
 
 
-                            pc.addTrack(stream.getVideoTracks()[0], stream) // video
-                            pc.addTrack(stream.getAudioTracks()[0], stream) // audio
-                            alert("added both the tracks from receiver from home.jsx")
+                            // pc.addTrack(stream.getVideoTracks()[0], stream) // video
+                            // pc.addTrack(stream.getAudioTracks()[0], stream) // audio
+                            // alert("added both the tracks from receiver from home.jsx")
+
+
+                            const videoTrack = props.webRTCContainerRef.current.senderStreamsObject.getVideoTracks()[0];
+        const audioTrack = props.webRTCContainerRef.current.senderStreamsObject.getAudioTracks()[0];
+        
+        if (!videoTrack || !audioTrack) {
+            throw new Error("Tracks missing from stream");
+        }
+        
+        // Step 3: WAIT for tracks to be ready (instead of throwing error)
+        alert(`Waiting for tracks... Video: ${videoTrack.readyState}, Audio: ${audioTrack.readyState}`);
+        
+        // Wait for video track to be live
+        if (videoTrack.readyState !== "live") {
+            await new Promise((resolve) => {
+                if (videoTrack.readyState === "live") {
+                    resolve();
+                } else {
+                    videoTrack.onunmute = () => {
+                        if (videoTrack.readyState === "live") {
+                            resolve();
+                        }
+                    };
+                    // Fallback: max 3 seconds wait
+                    setTimeout(resolve, 3000);
+                }
+            });
+        }
+        
+        // Wait for audio track to be live
+        if (audioTrack.readyState !== "live") {
+            await new Promise((resolve) => {
+                if (audioTrack.readyState === "live") {
+                    resolve();
+                } else {
+                    audioTrack.onunmute = () => {
+                        if (audioTrack.readyState === "live") {
+                            resolve();
+                        }
+                    };
+                    // Fallback: max 3 seconds wait
+                    setTimeout(resolve, 3000);
+                }
+            });
+        }
+        
+        alert(`Tracks ready now! Video: ${videoTrack.readyState}, Audio: ${audioTrack.readyState}`);
+        
+        // Step 4: Store stream
+    
+        props.webRTCContainerRef.current.senderTracksContainerArray = props.webRTCContainerRef.current.senderStreamsObject.getTracks();
+        
+        // Step 5: Add tracks to peer connection
+        props.webRTCContainerRef.current.senderPC.addTrack(videoTrack, webRTCContainerRef.current.senderStreamsObject);
+        alert("Video track added to PC");
+        
+        props.webRTCContainerRef.current.senderPC.addTrack(audioTrack, props.webRTCContainerRef.current.senderStreamsObject);
+        alert("Audio track added to PC");
+
+          props.webRTCContainerRef.current.senderTracksContainerArray = props.webRTCContainerRef.current.senderStreamsObject.getTracks();
+
 
 
 // ADD TTS TRACK HERE - BEFORE creating answer
