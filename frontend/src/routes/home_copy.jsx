@@ -696,9 +696,7 @@ el.autoplay = true;
 
                                     };
 
-                                    // Track state logs
-                                    event.track.onmute = () => console.log("Track muted");
-                                    event.track.onunmute = () => console.log("Track unmuted");
+                           
 
                                     setTimeout(() => el.play().catch(err => console.error("Playback failed:", err)), 100);
 

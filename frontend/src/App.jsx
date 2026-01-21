@@ -113,102 +113,101 @@ function App() {
 
 
 
-  webRTCContainerRef.current.webRTCStartFunction = async (motive = null) => {
-    try {
-      // Check WebSocket readiness
-      if (!socketContainer.current || socketContainer.current.readyState !== 1) {
-        // alert("WebSocket not ready");
-        alert("WebSocket not ready");
+  // ==================== IN App.jsx ====================
+
+
+webRTCContainerRef.current.webRTCStartFunction = async (motive = null) => {
+  try {
+    if (!socketContainer.current || socketContainer.current.readyState !== 1) {
+      alert("WebSocket not ready");
+      return;
+    }
+
+    // Close existing connection if any
+    if (webRTCContainerRef.current.senderPC) {
+      if (webRTCContainerRef.current.senderPC.connectionState === "connected") {
+        alert("A connection already exists, close it first.");
         return;
       }
-
-      // Cleanup existing connection if any
-      if (webRTCContainerRef.current.senderPC) {
-        if (webRTCContainerRef.current.senderPC.connectionState === "connected") {
-          // alert("A connection already exists, close it first.");
-          alert("A connection already exists, close it first.");
-          return;
-        }
-        try {
-          webRTCContainerRef.current.senderPC.getSenders().forEach(s => s.track && s.track.stop());
-          webRTCContainerRef.current.senderPC.close();
-        } catch (err) {
-          // alert("Error closing previous peer connection: " + err.message);
-          console.error("Error closing previous peer connection:", err);
-        }
-        webRTCContainerRef.current.senderPC = null;
+      try {
+        webRTCContainerRef.current.senderPC.getSenders().forEach(s => {
+          if (s.track) s.track.stop();
+        });
+        webRTCContainerRef.current.senderPC.close();
+      } catch (e) {
+        console.error("Error closing previous connection:", e);
       }
+      webRTCContainerRef.current.senderPC = null;
+    }
 
-      // Create new RTCPeerConnection
-      webRTCContainerRef.current.senderPC = new RTCPeerConnection();
-      webRTCContainerRef.current.senderDC = null;
-      alert("webrtc new connecion is starting sfrom here")
+    // Clean up old video elements
+    if (webRTCContainerRef.current.streamElementAtSender) {
+      webRTCContainerRef.current.streamElementAtSender.remove();
+      webRTCContainerRef.current.streamElementAtSender = null;
+    }
 
-      // Create DataChannel or MediaStream depending on motive
-      if (motive === "text") {
-        webRTCContainerRef.current.senderDC = webRTCContainerRef.current.senderPC.createDataChannel("text");
-      } else if (motive === "binary") {
-        webRTCContainerRef.current.senderDC = webRTCContainerRef.current.senderPC.createDataChannel("binary");
-      } else if (motive === "json") {
-        webRTCContainerRef.current.senderDC = webRTCContainerRef.current.senderPC.createDataChannel("json");
-      } else if (motive === "mediastream") {
-        alert("webrtc media stream motive chosen")
-        try {
-          webRTCContainerRef.current.senderStreamsObject = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+    // Stop old streams
+    if (webRTCContainerRef.current.senderStreamsObject) {
+      webRTCContainerRef.current.senderStreamsObject.getTracks().forEach(t => t.stop());
+    }
 
-          // Step 2: Get tracks
-        const videoTrack = webRTCContainerRef.current.senderStreamsObject.getVideoTracks()[0];
-        const audioTrack = webRTCContainerRef.current.senderStreamsObject.getAudioTracks()[0];
-        
-        if (!videoTrack || !audioTrack) {
-            throw new Error("Tracks missing from stream");
-        }
-        
-        
-       
-    
-        webRTCContainerRef.current.senderTracksContainerArray = webRTCContainerRef.current.senderStreamsObject.getTracks();
-        
-        // Step 5: Add tracks to peer connection
-        webRTCContainerRef.current.senderPC.addTrack(videoTrack, webRTCContainerRef.current.senderStreamsObject);
-        alert("Video track added to PC");
-        
-        webRTCContainerRef.current.senderPC.addTrack(audioTrack, webRTCContainerRef.current.senderStreamsObject);
-        alert("Audio track added to PC");
+    // Create new peer connection with STUN servers for better NAT traversal
+    webRTCContainerRef.current.senderPC = new RTCPeerConnection({
+      iceServers: [
+        { urls: 'stun:stun.l.google.com:19302' },
+        { urls: 'stun:stun1.l.google.com:19302' }
+      ]
+    });
 
-          webRTCContainerRef.current.senderTracksContainerArray = webRTCContainerRef.current.senderStreamsObject.getTracks();
+    const pc = webRTCContainerRef.current.senderPC;
 
-          // below is the tts track initialised
-          const { success, reused } = await textToSpeechContainerRef.current.initAudioCaptureFunction(); // dont fear about init, if it already exists, it will not reinite it will just use the same
-          // by the way here always initilise part will go 
-
-          if (success) {
-            const ttsTrack = await textToSpeechContainerRef.current.outputStream.getAudioTracks()[0];
-            webRTCContainerRef.current.senderPC.addTrack(ttsTrack, textToSpeechContainerRef.current.outputStream)
-            alert("webrtc tts track in succes in app.jsx")
-          } else {
-            alert("tts track is not addedd in app .jsx")
+    // Get media stream if needed
+    if (motive === "mediastream") {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ 
+          video: { 
+            facingMode: 'user',
+            width: { ideal: 1280 },
+            height: { ideal: 720 }
+          }, 
+          audio: {
+            echoCancellation: true,
+            noiseSuppression: true,
+            autoGainControl: true
           }
+        });
 
+        webRTCContainerRef.current.senderStreamsObject = stream;
 
-        } catch (err) {
-          alert("Some error in setting media stream(in app.jsx): " + err.name);
-          console.error("Some error in setting media stream:", err);
-          return;
-        }
-      } else {
-        webRTCContainerRef.current.senderDC = webRTCContainerRef.current.senderPC.createDataChannel("text");
-        alert("No motive provided, creating default text DataChannel");
+        // Add tracks to peer connection
+        stream.getTracks().forEach(track => {
+          pc.addTrack(track, stream);
+        });
+      } catch (err) {
+        alert("Camera/microphone access denied: " + err.message);
+        pc.close();
+        webRTCContainerRef.current.senderPC = null;
+        return;
       }
+    }
 
-      // RECEIVER TRACK HANDLER
-      webRTCContainerRef.current.senderPC.ontrack = (event) => {
-        try {
-          alert("a track came from receiver now see this in app.jsx kind> ",event.track.kind)
+    // Track which streams have been processed
+    if (!webRTCContainerRef.current.processedStreams) {
+      webRTCContainerRef.current.processedStreams = new Set();
+    }
 
-          if (event.track.kind === "video") {
-            // video
-            if (webRTCContainerRef.current.streamElementAtSender?.parentNode) {
+    // Handle incoming tracks
+    pc.ontrack = (event) => {
+      console.log("Track received:", event.track.kind);
+      const stream = event.streams[0];
+      const streamId = stream.id;
+
+      // Check if stream has video track
+      const hasVideo = stream.getVideoTracks().length > 0;
+      
+      if (event.track.kind === "video") {
+
+         if (webRTCContainerRef.current.streamElementAtSender?.parentNode) {
               webRTCContainerRef.current.streamElementAtSender.remove();
             }
 
@@ -492,137 +491,143 @@ function App() {
 
             alert("Receiver track added to sender side element");
             return
-          }
+        // Prevent duplicate video elements
+        // if (webRTCContainerRef.current.streamElementAtSender) {
+        //   return;
+        // }
 
-          // if(event.transceiver.mid === "1") {
-          //   // call audio // continue
-            
-          //   return
-          // }
-    
-          // if (event.transceiver.mid === "2") {
-      
-          //   const audio = document.createElement("audio");
-          //   audio.autoplay = true;
-          //   audio.srcObject = new MediaStream([event.track]);
-          //   audio.muted = false;
-          //   audio.playsInline = true;
+        // const video = document.createElement("video");
+        // video.srcObject = stream; // Entire stream (includes both video and audio)
+        // video.autoplay = true;
+        // video.playsInline = true;
+        // video.muted = false;
+        // video.controls = false;
+        // video.style.width = "100%";
+        // video.style.borderRadius = "calc(5*var(--med-border-radius))";
 
-          //   audio.play();
-          //   alert("played the small audio successfully")
-          //   return
-          // }
-          return
+        // // Play video with error handling
+        // video.play().catch(e => {
+        //   console.error("Video play error:", e);
+        //   video.onclick = () => video.play();
+        // });
 
-        } catch (err) {
-          // alert("Error handling incoming track: " + err.message);
-          alert("Error handling incoming track:", err);
-        }
-      };
+        // const container = document.createElement("section");
+        // container.style.width = "clamp(100px, 80%, 400px)";
+        // container.style.position = "relative";
+        
+        // // Add close button
+        // const closeBtn = document.createElement("button");
+        // closeBtn.textContent = "✖";
+        // closeBtn.style.position = "absolute";
+        // closeBtn.style.top = "10px";
+        // closeBtn.style.right = "10px";
+        // closeBtn.style.zIndex = "30";
+        // closeBtn.style.backgroundColor = "red";
+        // closeBtn.style.color = "white";
+        // closeBtn.style.border = "none";
+        // closeBtn.style.borderRadius = "50%";
+        // closeBtn.style.width = "30px";
+        // closeBtn.style.height = "30px";
+        // closeBtn.style.cursor = "pointer";
+        // closeBtn.onclick = () => {
+        //   if (webRTCContainerRef.current.senderPC) {
+        //     webRTCContainerRef.current.senderPC.close();
+        //     webRTCContainerRef.current.senderPC = null;
+        //   }
+        //   if (webRTCContainerRef.current.senderStreamsObject) {
+        //     webRTCContainerRef.current.senderStreamsObject.getTracks().forEach(t => t.stop());
+        //   }
+        //   container.remove();
+        //   webRTCContainerRef.current.streamElementAtSender = null;
+        // };
 
-      // DATA CHANNEL HANDLER
-      if (webRTCContainerRef.current.senderDC) {
-        webRTCContainerRef.current.senderDC.onopen = () => {
-          alert("Data channel open");
-          try { webRTCContainerRef.current.senderDC.send("Hello Sir"); } catch (err) { alert("Failed to send message: " + err.message); }
-        };
-        webRTCContainerRef.current.senderDC.onmessage = (e) => {
-          alert("Message from receiver:", e.data);
-          // alert(e.data);
-        };
-        webRTCContainerRef.current.senderDC.onerror = (err) => {
-          // alert("Data channel error: " + err.message);
-          alert("Data channel error:", err);
-        };
+        // container.appendChild(video);
+        // container.appendChild(closeBtn);
+
+        // const parent = document.getElementById("chats-div");
+        // if (parent) {
+        //   parent.appendChild(container);
+        //   parent.scrollTo({ top: parent.scrollHeight, behavior: 'smooth' });
+        // }
+
+        // webRTCContainerRef.current.streamElementAtSender = container;
+        
+        // // Mark this stream as processed (so we don't create separate audio element)
+        // webRTCContainerRef.current.processedStreams.add(streamId);
       }
 
-      // ICE CANDIDATE HANDLER
-      webRTCContainerRef.current.senderPC.onicecandidate = (e) => {
-        if (e.candidate) {
-          try {
-            socketContainer.current.send(JSON.stringify({
-              type: "query-message",
-              queryType: "ice",
-              sender: {
-                username: userRef.current.username,
-                id: userRef.current.id,
-                country: userRef.current.country,
-                customAccessToken: userRef.current.customAccessToken
-              },
-              receiver: userRef.current.focusedContact,
-              d: e.candidate
-            }));
-          } catch (err) {
-            // alert("Failed to send ICE candidate: " + err.message);
-            alert("Failed to send ICE candidate:", err);
-          }
-        }
-      };
+      // Only create separate audio element if:
+      // 1. It's an audio track AND
+      // 2. The stream has NO video track (standalone audio) AND
+      // 3. We haven't already processed this stream
+      if (event.track.kind === "audio" && 
+          !hasVideo && 
+          !webRTCContainerRef.current.processedStreams.has(streamId)) {
+        
+        console.log("Creating standalone audio element");
+        const audio = document.createElement("audio");
+        audio.srcObject = stream;
+        audio.autoplay = true;
+        audio.play().catch(e => console.error("Audio play error:", e));
+        
+        // Mark as processed
+        webRTCContainerRef.current.processedStreams.add(streamId);
+      }
+    };
 
-      // CREATE AND SEND OFFER
-      try {
-        // below is the tts track initialised
-        const { success, reused } = await textToSpeechContainerRef.current.initAudioCaptureFunction(); // dont fear about init, if it already exists, it will not reinite it will just use the same
-        // by the way here always initilise part will go 
-    
-        const offer = await webRTCContainerRef.current.senderPC.createOffer();
-        await webRTCContainerRef.current.senderPC.setLocalDescription(offer);
+    // Handle ICE candidates
+    pc.onicecandidate = (e) => {
+      if (e.candidate) {
         socketContainer.current.send(JSON.stringify({
           type: "query-message",
-          sender: {
-            username: userRef.current.username,
-            id: userRef.current.id,
-            country: userRef.current.country,
-            customAccessToken: userRef.current.customAccessToken
-          },
+          queryType: "ice",
+          sender: userRef.current,
           receiver: userRef.current.focusedContact,
-          queryType: "offer",
-          d: offer,
-   
+          d: e.candidate
         }));
-      } catch (err) {
-        // alert("Failed to create/send offer: " + err.message);
-        alert("Failed to create/send offer:", err);
-        return;
+      }
+    };
+
+    // Handle connection state changes
+    pc.onconnectionstatechange = () => {
+      console.log("Connection state:", pc.connectionState);
+      
+      if (pc.connectionState === "connected") {
+        console.log("WebRTC connected!");
       }
 
-      // CONNECTION STATE CHANGE HANDLER
-      webRTCContainerRef.current.senderPC.onconnectionstatechange = () => {
-        const pc = webRTCContainerRef.current.senderPC;
-        if (!pc) return;
-
-        const cleanup = () => {
-          try {
-            // Stop any TTS audio playing
-
-            textToSpeechContainerRef.current.cleanUp()
-
-            pc.getSenders().forEach(sender => { if (sender.track) { sender.track.stop(); pc.removeTrack(sender); } });
-            if (webRTCContainerRef.current.streamElementAtSender?.parentNode) { webRTCContainerRef.current.streamElementAtSender.remove(); webRTCContainerRef.current.streamElementAtSender = null; }
-            if (webRTCContainerRef.current.senderDC) { webRTCContainerRef.current.senderDC.close(); webRTCContainerRef.current.senderDC = null; }
-            pc.close();
-            webRTCContainerRef.current.senderPC = null;
-            rtcbuttonRef.current.style.backgroundColor = "transparent";
-            rtcbuttonRef.current.onclick = () => { webRTCContainerRef.current.webRTCStartFunction("mediastream"); };
-          } catch (err) { console.error("Cleanup failed:", err); }
-        };
-
-        if (pc.connectionState === "connected") {
-          rtcbuttonRef.current.style.backgroundColor = "red";
-          rtcbuttonRef.current.onclick = (e) => { e.stopPropagation(); cleanup(); };
+      if (pc.connectionState === "failed" || pc.connectionState === "closed") {
+        if (webRTCContainerRef.current.streamElementAtSender) {
+          webRTCContainerRef.current.streamElementAtSender.remove();
+          webRTCContainerRef.current.streamElementAtSender = null;
         }
-        if (pc.connectionState === "failed" || pc.connectionState === "closed") {
-          // alert("Connection failed/closed");
-          alert("Connection failed/closed, cleaning up");
-          cleanup();
+        if (webRTCContainerRef.current.senderStreamsObject) {
+          webRTCContainerRef.current.senderStreamsObject.getTracks().forEach(t => t.stop());
         }
-      };
+        pc.close();
+        webRTCContainerRef.current.senderPC = null;
+      }
+    };
 
-    } catch (err) {
-      // alert("WebRTC setup failed: " + err.message);
-      alert("WebRTC setup failed:", err);
-    }
-  };
+    // Create and send offer
+    const offer = await pc.createOffer();
+    await pc.setLocalDescription(offer);
+
+    socketContainer.current.send(JSON.stringify({
+      type: "query-message",
+      queryType: "offer",
+      sender: userRef.current,
+      receiver: userRef.current.focusedContact,
+      d: offer
+    }));
+
+  } catch (err) {
+    alert("WebRTC setup failed: " + err.message);
+    console.error(err);
+  }
+};
+
+
 
 
 
