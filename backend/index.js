@@ -17,7 +17,7 @@ connectDB().then((dbname) => {
 
     
 
-    const server = https.createServer((req, res) => {
+    const server = http.createServer((req, res) => {
 
 
             const headers = {

@@ -302,94 +302,127 @@ export function Home(props) {
                         return
                     }
 
-                    if (data.query === "offer") {
-  try {
+                    // ==================== IN home.jsx ====================
 
+// Replace the "offer" query handler in home.jsx with this:
+if (data.query === "offer") {
+  try {
     if (props.webRTCContainerRef.current.senderPC) {
       alert("Sorry, already a connection");
       return;
     }
 
-    alert("a offer came here and new connection from receiver home.jsx will be set");
+    console.log("Offer received, creating peer connection");
 
-    const pc = new RTCPeerConnection();
+    const pc = new RTCPeerConnection({
+      iceServers: [
+        { urls: 'stun:stun.l.google.com:19302' },
+        { urls: 'stun:stun1.l.google.com:19302' }
+      ]
+    });
     props.webRTCContainerRef.current.senderPC = pc;
 
-    let stream = props.webRTCContainerRef.current.senderStreamsObject;
-
-    if (!stream || !stream.getVideoTracks()[0] || stream.getVideoTracks()[0].readyState !== "live") {
-      try {
-        stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-        props.webRTCContainerRef.current.senderStreamsObject = stream;
-        alert("Capturing new stream audio and video at receiver");
-      } catch (err) {
-        alert("Camera capture unavailable at receiver:", err.name);
-        return;
-      }
+    // Get user media
+    let stream;
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({ 
+        video: { 
+          facingMode: 'user',
+          width: { ideal: 1280 },
+          height: { ideal: 720 }
+        }, 
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true
+        }
+      });
+      props.webRTCContainerRef.current.senderStreamsObject = stream;
+    } catch (err) {
+      alert("Camera/microphone access denied: " + err.message);
+      pc.close();
+      props.webRTCContainerRef.current.senderPC = null;
+      return;
     }
 
-    const videoTrack = stream.getVideoTracks()[0];
-    const audioTrack = stream.getAudioTracks()[0];
+    // Add tracks
+    stream.getTracks().forEach(track => {
+      pc.addTrack(track, stream);
+    });
 
-    pc.addTrack(videoTrack, stream);
-    pc.addTrack(audioTrack, stream);
-
-    // ✅ FIXED TRACK HANDLER
+    // Handle incoming tracks
     pc.ontrack = (event) => {
-      alert("Track arrived at receiver");
-      alert("Track kind: " + event.track.kind);
+      console.log("Track received at receiver:", event.track.kind);
 
-      // ✅ VIDEO
       if (event.track.kind === "video") {
-        if (props.webRTCContainerRef.current.streamElementAtReceiver) return;
+        if (props.webRTCContainerRef.current.streamElementAtReceiver) {
+          return;
+        }
 
-        const el = document.createElement("video");
-        el.srcObject = event.streams[0];
-        el.autoplay = true;
-        el.playsInline = true;
-        el.muted = false;
-        el.controls = true;
-        el.style.zIndex = "20";
-        el.style.width = "100%";
-        el.style.borderRadius = "calc(5*var(--med-border-radius))";
+        const video = document.createElement("video");
+        video.srcObject = event.streams[0];
+        video.autoplay = true;
+        video.playsInline = true;
+        video.muted = false;
+        video.controls = false;
+        video.style.width = "100%";
+        video.style.borderRadius = "calc(5*var(--med-border-radius))";
 
-        el.play().catch(() => {});
+        video.play().catch(e => {
+          console.error("Video play error:", e);
+          video.onclick = () => video.play();
+        });
 
         const container = document.createElement("section");
-        container.style.width = "clamp(100px,80%,400px)";
-        container.style.boxShadow = "1px 1px 2px 1px black";
-        container.style.border = "1px solid black";
+        container.style.width = "clamp(100px, 80%, 400px)";
+        container.style.position = "relative";
 
-        const button = document.createElement("button");
-        container.appendChild(el);
-        container.appendChild(button);
+        const closeBtn = document.createElement("button");
+        closeBtn.textContent = "✖";
+        closeBtn.style.position = "absolute";
+        closeBtn.style.top = "10px";
+        closeBtn.style.right = "10px";
+        closeBtn.style.zIndex = "30";
+        closeBtn.style.backgroundColor = "red";
+        closeBtn.style.color = "white";
+        closeBtn.style.border = "none";
+        closeBtn.style.borderRadius = "50%";
+        closeBtn.style.width = "30px";
+        closeBtn.style.height = "30px";
+        closeBtn.style.cursor = "pointer";
+        closeBtn.onclick = () => {
+          if (props.webRTCContainerRef.current.senderPC) {
+            props.webRTCContainerRef.current.senderPC.close();
+            props.webRTCContainerRef.current.senderPC = null;
+          }
+          if (props.webRTCContainerRef.current.senderStreamsObject) {
+            props.webRTCContainerRef.current.senderStreamsObject.getTracks().forEach(t => t.stop());
+          }
+          container.remove();
+          props.webRTCContainerRef.current.streamElementAtReceiver = null;
+        };
+
+        container.appendChild(video);
+        container.appendChild(closeBtn);
 
         const parent = document.getElementById("chats-div");
-        if (parent) parent.appendChild(container);
+        if (parent) {
+          parent.appendChild(container);
+          parent.scrollTo({ top: parent.scrollHeight, behavior: 'smooth' });
+        }
 
         props.webRTCContainerRef.current.streamElementAtReceiver = container;
-        props.webRTCContainerRef.current.streamElementParentAtReceiver = parent;
-        props.webRTCContainerRef.current.senderTC = event.track;
-
-        return;
       }
 
-      // ✅ AUDIO (DO NOT TOUCH VIDEO)
       if (event.track.kind === "audio") {
-        return;
+        const audio = document.createElement("audio");
+        audio.srcObject = event.streams[0];
+        audio.autoplay = true;
+        audio.play().catch(e => console.error("Audio play error:", e));
       }
     };
 
-    pc.ondatachannel = (event) => {
-      const dc = event.channel;
-      props.webRTCContainerRef.current.senderDC = dc;
-
-      dc.onopen = () => {
-        dc.send("Hello back Sir");
-      };
-      dc.onmessage = e => alert(e.data);
-    };
-
+    // Handle ICE candidates
     pc.onicecandidate = (e) => {
       if (e.candidate) {
         props.socketContainer.current.send(JSON.stringify({
@@ -402,7 +435,43 @@ export function Home(props) {
       }
     };
 
-    await pc.setRemoteDescription(data.d);
+    // Handle connection state
+    pc.onconnectionstatechange = () => {
+      console.log("Connection state:", pc.connectionState);
+
+      if (pc.connectionState === "connected") {
+        console.log("WebRTC connected!");
+      }
+
+      if (pc.connectionState === "failed" || pc.connectionState === "closed") {
+        if (props.webRTCContainerRef.current.streamElementAtReceiver) {
+          props.webRTCContainerRef.current.streamElementAtReceiver.remove();
+          props.webRTCContainerRef.current.streamElementAtReceiver = null;
+        }
+        if (props.webRTCContainerRef.current.senderStreamsObject) {
+          props.webRTCContainerRef.current.senderStreamsObject.getTracks().forEach(t => t.stop());
+        }
+        pc.close();
+        props.webRTCContainerRef.current.senderPC = null;
+      }
+    };
+
+    // Set remote description and create answer
+    await pc.setRemoteDescription(new RTCSessionDescription(data.d));
+    
+    // Process any queued ICE candidates
+    if (props.webRTCContainerRef.current.iceQueue?.length) {
+      for (const ice of props.webRTCContainerRef.current.iceQueue) {
+        try {
+          await pc.addIceCandidate(new RTCIceCandidate(ice));
+          console.log("Added queued ICE candidate");
+        } catch (e) {
+          console.error("Failed to add queued ICE:", e);
+        }
+      }
+      props.webRTCContainerRef.current.iceQueue = [];
+    }
+
     const answer = await pc.createAnswer();
     await pc.setLocalDescription(answer);
 
@@ -414,23 +483,9 @@ export function Home(props) {
       d: answer
     }));
 
-    pc.onconnectionstatechange = () => {
-      if (pc.connectionState === "connected") {
-        props.rtcbuttonRef.current.style.backgroundColor = "red";
-      }
-
-      if (pc.connectionState === "failed" || pc.connectionState === "closed") {
-        if (props.webRTCContainerRef.current.streamElementAtReceiver) {
-          props.webRTCContainerRef.current.streamElementAtReceiver.remove();
-          props.webRTCContainerRef.current.streamElementAtReceiver = null;
-        }
-        pc.close();
-        props.webRTCContainerRef.current.senderPC = null;
-      }
-    };
-
   } catch (err) {
     console.error("Receiver WebRTC setup failed:", err);
+    alert("Failed to establish connection: " + err.message);
   }
   return;
 }

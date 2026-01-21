@@ -112,85 +112,162 @@ function App() {
 
 
 
+// ==================== IN App.jsx ====================
 
-  webRTCContainerRef.current.webRTCStartFunction = async (motive = null) => {
+// Replace the webRTCStartFunction in App.jsx with this:
+webRTCContainerRef.current.webRTCStartFunction = async (motive = null) => {
   try {
     if (!socketContainer.current || socketContainer.current.readyState !== 1) {
       alert("WebSocket not ready");
       return;
     }
 
+    // Close existing connection if any
     if (webRTCContainerRef.current.senderPC) {
       if (webRTCContainerRef.current.senderPC.connectionState === "connected") {
         alert("A connection already exists, close it first.");
         return;
       }
       try {
-        webRTCContainerRef.current.senderPC.getSenders().forEach(s => s.track && s.track.stop());
+        webRTCContainerRef.current.senderPC.getSenders().forEach(s => {
+          if (s.track) s.track.stop();
+        });
         webRTCContainerRef.current.senderPC.close();
-      } catch {}
+      } catch (e) {
+        console.error("Error closing previous connection:", e);
+      }
       webRTCContainerRef.current.senderPC = null;
     }
 
-    webRTCContainerRef.current.senderPC = new RTCPeerConnection();
-    webRTCContainerRef.current.senderDC = null;
-
-    if (motive === "mediastream") {
-      webRTCContainerRef.current.senderStreamsObject =
-        await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-
-      const stream = webRTCContainerRef.current.senderStreamsObject;
-      stream.getTracks().forEach(t =>
-        webRTCContainerRef.current.senderPC.addTrack(t, stream)
-      );
+    // Clean up old video elements
+    if (webRTCContainerRef.current.streamElementAtSender) {
+      webRTCContainerRef.current.streamElementAtSender.remove();
+      webRTCContainerRef.current.streamElementAtSender = null;
     }
 
-    // ✅ FIXED RECEIVER TRACK HANDLER
-    webRTCContainerRef.current.senderPC.ontrack = (event) => {
+    // Stop old streams
+    if (webRTCContainerRef.current.senderStreamsObject) {
+      webRTCContainerRef.current.senderStreamsObject.getTracks().forEach(t => t.stop());
+    }
+
+    // Create new peer connection with STUN servers for better NAT traversal
+    webRTCContainerRef.current.senderPC = new RTCPeerConnection({
+      iceServers: [
+        { urls: 'stun:stun.l.google.com:19302' },
+        { urls: 'stun:stun1.l.google.com:19302' }
+      ]
+    });
+
+    const pc = webRTCContainerRef.current.senderPC;
+
+    // Get media stream if needed
+    if (motive === "mediastream") {
       try {
-        const track = event.track;
+        const stream = await navigator.mediaDevices.getUserMedia({ 
+          video: { 
+            facingMode: 'user',
+            width: { ideal: 1280 },
+            height: { ideal: 720 }
+          }, 
+          audio: {
+            echoCancellation: true,
+            noiseSuppression: true,
+            autoGainControl: true
+          }
+        });
 
-        // ✅ VIDEO HANDLING (FIX)
-        if (track.kind === "video") {
-          if (webRTCContainerRef.current.streamElementAtSender) return;
+        webRTCContainerRef.current.senderStreamsObject = stream;
 
-          const video = document.createElement("video");
-          video.srcObject = event.streams[0];
-          video.autoplay = true;
-          video.playsInline = true;
-          video.muted = false;
-          video.controls = true;
-          video.style.zIndex = "20";
-          video.style.borderRadius = "calc(5*var(--med-border-radius))";
-
-          video.play().catch(() => {});
-
-          const container = document.createElement("section");
-          container.style.width = "clamp(100px,80%,400px)";
-          container.appendChild(video);
-
-          const parent = document.getElementById("chats-div");
-          if (parent) parent.appendChild(container);
-
-          webRTCContainerRef.current.streamElementAtSender = container;
-          return;
-        }
-
-        // ✅ AUDIO HANDLING (DO NOT TOUCH VIDEO)
-        if (track.kind === "audio") {
-          const audio = document.createElement("audio");
-          audio.srcObject = event.streams[0];
-          audio.autoplay = true;
-          audio.play().catch(() => {});
-          return;
-        }
-
+        // Add tracks to peer connection
+        stream.getTracks().forEach(track => {
+          pc.addTrack(track, stream);
+        });
       } catch (err) {
-        console.error(err);
+        alert("Camera/microphone access denied: " + err.message);
+        pc.close();
+        webRTCContainerRef.current.senderPC = null;
+        return;
+      }
+    }
+
+    // Handle incoming tracks
+    pc.ontrack = (event) => {
+      console.log("Track received:", event.track.kind);
+
+      if (event.track.kind === "video") {
+        // Prevent duplicate video elements
+        if (webRTCContainerRef.current.streamElementAtSender) {
+          return;
+        }
+
+        const video = document.createElement("video");
+        video.srcObject = event.streams[0];
+        video.autoplay = true;
+        video.playsInline = true;
+        video.muted = false;
+        video.controls = false;
+        video.style.width = "100%";
+        video.style.borderRadius = "calc(5*var(--med-border-radius))";
+
+        // Play video with error handling
+        video.play().catch(e => {
+          console.error("Video play error:", e);
+          // Retry on user interaction
+          video.onclick = () => video.play();
+        });
+
+        const container = document.createElement("section");
+        container.style.width = "clamp(100px, 80%, 400px)";
+        container.style.position = "relative";
+        
+        // Add close button
+        const closeBtn = document.createElement("button");
+        closeBtn.textContent = "✖";
+        closeBtn.style.position = "absolute";
+        closeBtn.style.top = "10px";
+        closeBtn.style.right = "10px";
+        closeBtn.style.zIndex = "30";
+        closeBtn.style.backgroundColor = "red";
+        closeBtn.style.color = "white";
+        closeBtn.style.border = "none";
+        closeBtn.style.borderRadius = "50%";
+        closeBtn.style.width = "30px";
+        closeBtn.style.height = "30px";
+        closeBtn.style.cursor = "pointer";
+        closeBtn.onclick = () => {
+          if (webRTCContainerRef.current.senderPC) {
+            webRTCContainerRef.current.senderPC.close();
+            webRTCContainerRef.current.senderPC = null;
+          }
+          if (webRTCContainerRef.current.senderStreamsObject) {
+            webRTCContainerRef.current.senderStreamsObject.getTracks().forEach(t => t.stop());
+          }
+          container.remove();
+          webRTCContainerRef.current.streamElementAtSender = null;
+        };
+
+        container.appendChild(video);
+        container.appendChild(closeBtn);
+
+        const parent = document.getElementById("chats-div");
+        if (parent) {
+          parent.appendChild(container);
+          parent.scrollTo({ top: parent.scrollHeight, behavior: 'smooth' });
+        }
+
+        webRTCContainerRef.current.streamElementAtSender = container;
+      }
+
+      if (event.track.kind === "audio") {
+        const audio = document.createElement("audio");
+        audio.srcObject = event.streams[0];
+        audio.autoplay = true;
+        audio.play().catch(e => console.error("Audio play error:", e));
       }
     };
 
-    webRTCContainerRef.current.senderPC.onicecandidate = (e) => {
+    // Handle ICE candidates
+    pc.onicecandidate = (e) => {
       if (e.candidate) {
         socketContainer.current.send(JSON.stringify({
           type: "query-message",
@@ -202,8 +279,30 @@ function App() {
       }
     };
 
-    const offer = await webRTCContainerRef.current.senderPC.createOffer();
-    await webRTCContainerRef.current.senderPC.setLocalDescription(offer);
+    // Handle connection state changes
+    pc.onconnectionstatechange = () => {
+      console.log("Connection state:", pc.connectionState);
+      
+      if (pc.connectionState === "connected") {
+        console.log("WebRTC connected!");
+      }
+
+      if (pc.connectionState === "failed" || pc.connectionState === "closed") {
+        if (webRTCContainerRef.current.streamElementAtSender) {
+          webRTCContainerRef.current.streamElementAtSender.remove();
+          webRTCContainerRef.current.streamElementAtSender = null;
+        }
+        if (webRTCContainerRef.current.senderStreamsObject) {
+          webRTCContainerRef.current.senderStreamsObject.getTracks().forEach(t => t.stop());
+        }
+        pc.close();
+        webRTCContainerRef.current.senderPC = null;
+      }
+    };
+
+    // Create and send offer
+    const offer = await pc.createOffer();
+    await pc.setLocalDescription(offer);
 
     socketContainer.current.send(JSON.stringify({
       type: "query-message",
@@ -214,10 +313,11 @@ function App() {
     }));
 
   } catch (err) {
-    alert("WebRTC setup failed");
+    alert("WebRTC setup failed: " + err.message);
     console.error(err);
   }
 };
+
 
 
 
