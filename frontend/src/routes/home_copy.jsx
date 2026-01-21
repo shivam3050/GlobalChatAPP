@@ -394,7 +394,7 @@ export function Home(props) {
         props.webRTCContainerRef.current.senderTracksContainerArray = props.webRTCContainerRef.current.senderStreamsObject.getTracks();
         
         // Step 5: Add tracks to peer connection
-        props.webRTCContainerRef.current.senderPC.addTrack(videoTrack, webRTCContainerRef.current.senderStreamsObject);
+        props.webRTCContainerRef.current.senderPC.addTrack(videoTrack, props.webRTCContainerRef.current.senderStreamsObject);
         alert("Video track added to PC");
         
         props.webRTCContainerRef.current.senderPC.addTrack(audioTrack, props.webRTCContainerRef.current.senderStreamsObject);
