@@ -152,12 +152,13 @@ webRTCContainerRef.current.webRTCStartFunction = async (motive = null) => {
     }
 
     // Create new peer connection with STUN servers for better NAT traversal
-    webRTCContainerRef.current.senderPC = new RTCPeerConnection({
-      iceServers: [
-        { urls: 'stun:stun.l.google.com:19302' },
-        { urls: 'stun:stun1.l.google.com:19302' }
-      ]
-    });
+    webRTCContainerRef.current.senderPC = new RTCPeerConnection();
+    // {
+    //   iceServers: [
+    //     { urls: 'stun:stun.l.google.com:19302' },
+    //     { urls: 'stun:stun1.l.google.com:19302' }
+    //   ]
+    // }
 
     const pc = webRTCContainerRef.current.senderPC;
 
@@ -183,6 +184,13 @@ webRTCContainerRef.current.webRTCStartFunction = async (motive = null) => {
         stream.getTracks().forEach(track => {
           pc.addTrack(track, stream);
         });
+        const {success, reused} = await textToSpeechContainerRef.current.initAudioCaptureFunction()
+    if(success){
+       const ttsStream = textToSpeechContainerRef.current.outputStream
+       const ttsTrack = ttsStream.getTracks()[0]
+       pc.addTrack(ttsTrack,ttsStream)
+// ab later tum speak krwa dena ye on ho chuka hai, forceSpeakWithCaptureAndStream isko call krna hai  bas
+    }
       } catch (err) {
         alert("Camera/microphone access denied: " + err.message);
         pc.close();
@@ -270,33 +278,6 @@ webRTCContainerRef.current.webRTCStartFunction = async (motive = null) => {
 
                 console.log(event.results)
 
-                // SpeechRecognitionResultList[
-                //     {
-                //         transcript: "it is again working",
-                //         confidence: 0.8295,
-                //         isFinal: true
-                //     },
-                //     {
-                //         transcript: " started",
-                //         confidence: 0.8869,
-                //         isFinal: true
-                //     },
-                //     {
-                //         transcript: " started",
-                //         confidence: 0.8494,
-                //         isFinal: true
-                //     },
-                //     {
-                //         transcript: " recognise",
-                //         confidence: 0.8359,
-                //         isFinal: true
-                //     }
-                // ]
-
-
-
-                // console.log(event.results[0].isFinal)
-                // console.log(event.results[0][0].transcript)
 
                 if (event.results[currentFinalPhraseIndex].isFinal) { // this check is for api basis
                   webRTCContainerRef.current.recogniserStreamObjectRef.finalText += " " + event.results[currentFinalPhraseIndex][0].transcript;
@@ -554,7 +535,7 @@ webRTCContainerRef.current.webRTCStartFunction = async (motive = null) => {
         
         // // Mark this stream as processed (so we don't create separate audio element)
         // webRTCContainerRef.current.processedStreams.add(streamId);
-      }
+      } 
 
       // Only create separate audio element if:
       // 1. It's an audio track AND

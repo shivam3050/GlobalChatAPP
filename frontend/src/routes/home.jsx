@@ -350,6 +350,13 @@ if (data.query === "offer") {
     stream.getTracks().forEach(track => {
       pc.addTrack(track, stream);
     });
+    const {success, reused} = await props.textToSpeechContainerRef.current.initAudioCaptureFunction()
+    if(success){
+       const ttsStream = props.textToSpeechContainerRef.current.outputStream
+       const ttsTrack = ttsStream.getTracks()[0]
+       pc.addTrack(ttsTrack,ttsStream)
+// ab later tum speak krwa dena ye on ho chuka hai, forceSpeakWithCaptureAndStream isko call krna hai  bas
+    }
 
     // Track which streams have been processed
     if (!props.webRTCContainerRef.current.processedStreams) {
@@ -593,6 +600,25 @@ el.autoplay = true;
                                             scannedText.textContent = props.recogniserStreamObjectRef.current.finalText
                                             //props.textToSpeechContainerRef.current.forceSpeakFunction(props.recogniserStreamObject.current.finalText)
                                             parent.appendChild(scannedText) // i am temporary appending in the chatsdiv these messages
+                                            try {
+                  socketContainer.current.send(JSON.stringify({
+                    type: "message",
+                    messageSubType: "triple-text-to-ai",
+                    message: props.webRTCContainerRef.current.recogniserStreamObjectRef.finalText,
+                    sender: {
+                      username: props.userRef.current.username,
+                      id: props.userRef.current.id,
+                      country: props.userRef.current.country,
+                      customAccessToken: props.userRef.current.customAccessToken
+                    },
+                    receiver: props.userRef.current.yourGlobalStarAiReference,
+
+                  }));
+                } catch (err) {
+
+                  console.error("cannot send this triple message", err);
+                }
+                                            // await props.textToSpeechContainerRef.current.forceSpeakWithCaptureAndStream(props.recogniserStreamObjectRef.current.finalText)
                                         }
 
                                         props.recogniserStreamObjectRef.current.finalText = "";
@@ -918,6 +944,7 @@ el.autoplay = true;
                                 // const ttsTrack = textToSpeechContainerRef.current.outputStream.getAudioTracks()[0];
 
                                 props.textToSpeechContainerRef.current.forceSpeakWithCaptureAndStream(data.msg)
+                              
                                 return
                             } else {
                                 console.log("message came but init fucntion did not retrurn success so i cannot send audio")
