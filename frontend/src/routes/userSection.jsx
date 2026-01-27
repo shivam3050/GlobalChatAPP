@@ -93,7 +93,7 @@ export const UserSection = (props) => {
                             </div>
                         </div>
                         <div>
-                            <section style={{backgroundImage:`url(${props.CountryMap.get(user.country)?.png})`}}></section>
+                            <section style={{backgroundImage:(user.country==="nocountry")?('url("default_user_photo.png")'):(`url(${props.CountryMap.get(user.country)?.png})`)}}></section>
 
                         </div>
                     </div>
