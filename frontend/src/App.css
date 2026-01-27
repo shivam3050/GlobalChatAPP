@@ -669,7 +669,7 @@ input[type="password"]:hover {
 }
 
 .my-contact-field-container::before {
-    content: "● " attr(data-online-users-count) "  Online";
+    content: "● " attr(data-online-users-count) "  Online" "      powered by Shivam" ;
     height: 12px;
     width: 12px;
     position: relative;
@@ -1598,7 +1598,7 @@ input[type="password"]:hover {
     }
 
     .my-contact-field-container:before {
-        content: "● " attr(data-online-users-count) " Online";
+        content: "● " attr(data-online-users-count) " Online" "      powered by Shivam";
         height: 12px;
         width: 12px;
         position: relative;
