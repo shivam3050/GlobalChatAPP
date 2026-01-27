@@ -2493,7 +2493,7 @@ export function Home(props) {
 
                     <section
                         className="button hovereffectbtn" ref={props.rtcbuttonRef}
-                        style={{ display: selectedReceiver.username ? "flex" : "none" }}
+                        style={{ display: selectedReceiver.username ? "none" : "none" }}
                         onClick={() => { props.webRTCContainerRef.current.webRTCStartFunction("mediastream") }}
                     >
                         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-telephone-plus-fill" viewBox="0 0 16 16">
