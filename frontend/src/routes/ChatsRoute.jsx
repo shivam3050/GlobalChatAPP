@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { ChatSection } from './chat';
 
 
@@ -213,7 +213,7 @@ function ChatsRoute(props) {
                     chatTextField.textContent = message
 
                     const speakMessage = document.createElement("span")
-                    speakMessage.textContent = "⏵"
+                    speakMessage.textContent = "▶"
                     // give a class to it
                     speakMessage.classList.add("hovereffectbtn")
                     speakMessage.classList.add("playAnyMessageBtn")

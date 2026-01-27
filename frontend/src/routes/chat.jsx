@@ -318,7 +318,7 @@ export const ChatSection = (props) => {
                     {item.isLink ? (<><span> {shortFilename(item.content)}</span> <br></br>
                       <span> {
                         (item.fileSize < 1024) ? (Math.trunc(item.fileSize * 100) / 100 + " B") : ((item.fileSize < 1048576) ? (Math.trunc((item.fileSize / 1024) * 100) / 100 + " KB") : (Math.trunc((item.fileSize / 1048576) * 100) / 100 + " MB"))
-                      }</span></>) : (<>{item.content}<span className="hovereffectbtn playAnyMessageBtn" onClick={()=> props.textToSpeechContainerRef.current.forceSpeakFunction(item.content)}></span></>)}
+                      }</span></>) : (<>{item.content}<span className="hovereffectbtn playAnyMessageBtn" onClick={()=> props.textToSpeechContainerRef.current.forceSpeakFunction(item.content)}>▶</span></>)}
 
 
 
