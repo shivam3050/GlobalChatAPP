@@ -304,76 +304,117 @@ export function Home(props) {
 
                     // ==================== IN home.jsx ====================
 
-// Replace the "offer" query handler in home.jsx with this:
-if (data.query === "offer") {
-  try {
-    if (props.webRTCContainerRef.current.senderPC) {
-      alert("Sorry, already a connection");
-      return;
-    }
+                    // Replace the "offer" query handler in home.jsx with this:
+                    if (data.query === "offer") {
+                        try {
+                            const cleanup = () => {
+                                    // Track cleanup
+                                    props.textToSpeechContainerRef.current.cleanUp()
 
-    console.log("Offer received, creating peer connection");
+                                    if (props.webRTCContainerRef.current.senderTC) {
+                                        props.webRTCContainerRef.current.senderTC.stop();
+                                        // const el = props.webRTCContainerRef.current.streamElementAtReceiver;
+                                        // const parent = props.webRTCContainerRef.current.streamElementParentAtReceiver;
+                                        // if (el && parent && parent.contains(el)) parent.removeChild(el);
+                                        // props.webRTCContainerRef.current.streamElementAtReceiver = null;
+                                        props.webRTCContainerRef.current.senderTC = null;
+                                        console.log("Track cleaned up");
+                                    }
+                                    const el = props.webRTCContainerRef.current.streamElementAtReceiver;
+                                        const parent = props.webRTCContainerRef.current.streamElementParentAtReceiver;
+                                        if (el && parent && parent.contains(el)) parent.removeChild(el);
+                                        props.webRTCContainerRef.current.streamElementAtReceiver = null;
 
-    const pc = new RTCPeerConnection({
-      iceServers: [
-        { urls: 'stun:stun.l.google.com:19302' },
-        { urls: 'stun:stun1.l.google.com:19302' }
-      ]
-    });
-    props.webRTCContainerRef.current.senderPC = pc;
+                                    // Data channel cleanup
+                                    if (props.webRTCContainerRef.current.senderDC) {
+                                        props.webRTCContainerRef.current.senderDC.close();
+                                        props.webRTCContainerRef.current.senderDC = null;
+                                        console.log("Data channel closed");
+                                    }
 
-    // Get user media
-    let stream;
-    try {
-      stream = await navigator.mediaDevices.getUserMedia({ 
-        video: { 
-          facingMode: 'user',
-          width: { ideal: 1280 },
-          height: { ideal: 720 }
-        }, 
-        audio: {
-          echoCancellation: true,
-          noiseSuppression: true,
-          autoGainControl: true
-        }
-      });
-      props.webRTCContainerRef.current.senderStreamsObject = stream;
-    } catch (err) {
-      alert("Camera/microphone access denied: " + err.message);
-      pc.close();
-      props.webRTCContainerRef.current.senderPC = null;
-      return;
-    }
-    
+                                    // Peer connection cleanup
+                                    if (props.webRTCContainerRef.current.senderPC) {
+                                        props.webRTCContainerRef.current.senderPC.getSenders().forEach(sender => { if (sender.track) { sender.track.stop(); pc.removeTrack(sender); } });
+                                        props.webRTCContainerRef.current.senderPC.close();
+                                        props.webRTCContainerRef.current.senderPC = null;
+                                        console.log("Peer connection closed");
+                                    }
 
-    // Add tracks
-    stream.getTracks().forEach(track => {
-      pc.addTrack(track, stream);
-    });
-    const {success, reused} = await props.textToSpeechContainerRef.current.initAudioCaptureFunction()
-    if(success){
-       const ttsStream = props.textToSpeechContainerRef.current.outputStream
-       const ttsTrack = ttsStream.getTracks()[0]
-       pc.addTrack(ttsTrack,ttsStream)
-// ab later tum speak krwa dena ye on ho chuka hai, forceSpeakWithCaptureAndStream isko call krna hai  bas
-    }
+                                    // Reset button
+                                    props.rtcbuttonRef.current.style.backgroundColor = "transparent";
+                                    props.rtcbuttonRef.current.onclick = () => {
+                                        props.webRTCContainerRef.current.webRTCStartFunction("mediastream");
+                                    };
 
-    // Track which streams have been processed
-    if (!props.webRTCContainerRef.current.processedStreams) {
-      props.webRTCContainerRef.current.processedStreams = new Set();
-    }
 
-    // Handle incoming tracks
-    pc.ontrack = (event) => {
-      console.log("Track received at receiver:", event.track.kind);
-      const stream = event.streams[0];
-      const streamId = stream.id;
+                                };
+                            if (props.webRTCContainerRef.current.senderPC) {
+                                alert("Sorry, already a connection");
+                                return;
+                            }
 
-      // Check if stream has video track
-      const hasVideo = stream.getVideoTracks().length > 0;
+                            console.log("Offer received, creating peer connection");
 
-      if (event.track.kind === "video") {
-         //video is coming
+                            const pc = new RTCPeerConnection({
+                                iceServers: [
+                                    { urls: 'stun:stun.l.google.com:19302' },
+                                    { urls: 'stun:stun1.l.google.com:19302' }
+                                ]
+                            });
+                            props.webRTCContainerRef.current.senderPC = pc;
+
+                            // Get user media
+                            let stream;
+                            try {
+                                stream = await navigator.mediaDevices.getUserMedia({
+                                    video: {
+                                        facingMode: 'user',
+                                        width: { ideal: 1280 },
+                                        height: { ideal: 720 }
+                                    },
+                                    audio: {
+                                        echoCancellation: true,
+                                        noiseSuppression: true,
+                                        autoGainControl: true
+                                    }
+                                });
+                                props.webRTCContainerRef.current.senderStreamsObject = stream;
+                            } catch (err) {
+                                alert("Camera/microphone access denied: " + err.message);
+                                pc.close();
+                                props.webRTCContainerRef.current.senderPC = null;
+                                return;
+                            }
+
+
+                            // Add tracks
+                            stream.getTracks().forEach(track => {
+                                pc.addTrack(track, stream);
+                            });
+                            const { success, reused } = await props.textToSpeechContainerRef.current.initAudioCaptureFunction()
+                            if (success) {
+                                const ttsStream = props.textToSpeechContainerRef.current.outputStream
+                                const ttsTrack = ttsStream.getTracks()[0]
+                                pc.addTrack(ttsTrack, ttsStream)
+                                // ab later tum speak krwa dena ye on ho chuka hai, forceSpeakWithCaptureAndStream isko call krna hai  bas
+                            }
+
+                            // Track which streams have been processed
+                            if (!props.webRTCContainerRef.current.processedStreams) {
+                                props.webRTCContainerRef.current.processedStreams = new Set();
+                            }
+
+                            // Handle incoming tracks
+                            pc.ontrack = (event) => {
+                                console.log("Track received at receiver:", event.track.kind);
+                                const stream = event.streams[0];
+                                const streamId = stream.id;
+
+                                // Check if stream has video track
+                                const hasVideo = stream.getVideoTracks().length > 0;
+
+                                if (event.track.kind === "video") {
+                                    //video is coming
                                     if (props.webRTCContainerRef.current.streamElementAtReceiver?.parentNode) {
                                         props.webRTCContainerRef.current.streamElementAtReceiver.remove();
                                     }
@@ -387,8 +428,8 @@ if (data.query === "offer") {
                                     el.playsInline = true;
                                     el.srcObject = event.streams[0];
                                     el.muted = true;
-el.playsInline = true;
-el.autoplay = true;
+                                    el.playsInline = true;
+                                    el.autoplay = true;
 
                                     const videoDivAndSTTBtnContainer = document.createElement("section")
                                     videoDivAndSTTBtnContainer.style.width = "clamp(100px,80%,400px)";
@@ -601,23 +642,23 @@ el.autoplay = true;
                                             //props.textToSpeechContainerRef.current.forceSpeakFunction(props.recogniserStreamObject.current.finalText)
                                             parent.appendChild(scannedText) // i am temporary appending in the chatsdiv these messages
                                             try {
-                  socketContainer.current.send(JSON.stringify({
-                    type: "message",
-                    messageSubType: "triple-text-to-ai",
-                    message: props.webRTCContainerRef.current.recogniserStreamObjectRef.finalText,
-                    sender: {
-                      username: props.userRef.current.username,
-                      id: props.userRef.current.id,
-                      country: props.userRef.current.country,
-                      customAccessToken: props.userRef.current.customAccessToken
-                    },
-                    receiver: props.userRef.current.yourGlobalStarAiReference,
+                                                socketContainer.current.send(JSON.stringify({
+                                                    type: "message",
+                                                    messageSubType: "triple-text-to-ai",
+                                                    message: props.webRTCContainerRef.current.recogniserStreamObjectRef.finalText,
+                                                    sender: {
+                                                        username: props.userRef.current.username,
+                                                        id: props.userRef.current.id,
+                                                        country: props.userRef.current.country,
+                                                        customAccessToken: props.userRef.current.customAccessToken
+                                                    },
+                                                    receiver: props.userRef.current.yourGlobalStarAiReference,
 
-                  }));
-                } catch (err) {
+                                                }));
+                                            } catch (err) {
 
-                  console.error("cannot send this triple message", err);
-                }
+                                                console.error("cannot send this triple message", err);
+                                            }
                                             // await props.textToSpeechContainerRef.current.forceSpeakWithCaptureAndStream(props.recogniserStreamObjectRef.current.finalText)
                                         }
 
@@ -660,154 +701,165 @@ el.autoplay = true;
                                     };
 
                                     return
-        // if (props.webRTCContainerRef.current.streamElementAtReceiver) {
-        //   return;
-        // }
+                                    // if (props.webRTCContainerRef.current.streamElementAtReceiver) {
+                                    //   return;
+                                    // }
 
-        // const video = document.createElement("video");
-        // video.srcObject = stream; // Entire stream (includes both video and audio)
-        // video.autoplay = true;
-        // video.playsInline = true;
-        // video.muted = false;
-        // video.controls = false;
-        // video.style.width = "100%";
-        // video.style.borderRadius = "calc(5*var(--med-border-radius))";
+                                    // const video = document.createElement("video");
+                                    // video.srcObject = stream; // Entire stream (includes both video and audio)
+                                    // video.autoplay = true;
+                                    // video.playsInline = true;
+                                    // video.muted = false;
+                                    // video.controls = false;
+                                    // video.style.width = "100%";
+                                    // video.style.borderRadius = "calc(5*var(--med-border-radius))";
 
-        // video.play().catch(e => {
-        //   console.error("Video play error:", e);
-        //   video.onclick = () => video.play();
-        // });
+                                    // video.play().catch(e => {
+                                    //   console.error("Video play error:", e);
+                                    //   video.onclick = () => video.play();
+                                    // });
 
-        // const container = document.createElement("section");
-        // container.style.width = "clamp(100px, 80%, 400px)";
-        // container.style.position = "relative";
+                                    // const container = document.createElement("section");
+                                    // container.style.width = "clamp(100px, 80%, 400px)";
+                                    // container.style.position = "relative";
 
-        // const closeBtn = document.createElement("button");
-        // closeBtn.textContent = "✖";
-        // closeBtn.style.position = "absolute";
-        // closeBtn.style.top = "10px";
-        // closeBtn.style.right = "10px";
-        // closeBtn.style.zIndex = "30";
-        // closeBtn.style.backgroundColor = "red";
-        // closeBtn.style.color = "white";
-        // closeBtn.style.border = "none";
-        // closeBtn.style.borderRadius = "50%";
-        // closeBtn.style.width = "30px";
-        // closeBtn.style.height = "30px";
-        // closeBtn.style.cursor = "pointer";
-        // closeBtn.onclick = () => {
-        //   if (props.webRTCContainerRef.current.senderPC) {
-        //     props.webRTCContainerRef.current.senderPC.close();
-        //     props.webRTCContainerRef.current.senderPC = null;
-        //   }
-        //   if (props.webRTCContainerRef.current.senderStreamsObject) {
-        //     props.webRTCContainerRef.current.senderStreamsObject.getTracks().forEach(t => t.stop());
-        //   }
-        //   container.remove();
-        //   props.webRTCContainerRef.current.streamElementAtReceiver = null;
-        // };
+                                    // const closeBtn = document.createElement("button");
+                                    // closeBtn.textContent = "✖";
+                                    // closeBtn.style.position = "absolute";
+                                    // closeBtn.style.top = "10px";
+                                    // closeBtn.style.right = "10px";
+                                    // closeBtn.style.zIndex = "30";
+                                    // closeBtn.style.backgroundColor = "red";
+                                    // closeBtn.style.color = "white";
+                                    // closeBtn.style.border = "none";
+                                    // closeBtn.style.borderRadius = "50%";
+                                    // closeBtn.style.width = "30px";
+                                    // closeBtn.style.height = "30px";
+                                    // closeBtn.style.cursor = "pointer";
+                                    // closeBtn.onclick = () => {
+                                    //   if (props.webRTCContainerRef.current.senderPC) {
+                                    //     props.webRTCContainerRef.current.senderPC.close();
+                                    //     props.webRTCContainerRef.current.senderPC = null;
+                                    //   }
+                                    //   if (props.webRTCContainerRef.current.senderStreamsObject) {
+                                    //     props.webRTCContainerRef.current.senderStreamsObject.getTracks().forEach(t => t.stop());
+                                    //   }
+                                    //   container.remove();
+                                    //   props.webRTCContainerRef.current.streamElementAtReceiver = null;
+                                    // };
 
-        // container.appendChild(video);
-        // container.appendChild(closeBtn);
+                                    // container.appendChild(video);
+                                    // container.appendChild(closeBtn);
 
-        // const parent = document.getElementById("chats-div");
-        // if (parent) {
-        //   parent.appendChild(container);
-        //   parent.scrollTo({ top: parent.scrollHeight, behavior: 'smooth' });
-        // }
+                                    // const parent = document.getElementById("chats-div");
+                                    // if (parent) {
+                                    //   parent.appendChild(container);
+                                    //   parent.scrollTo({ top: parent.scrollHeight, behavior: 'smooth' });
+                                    // }
 
-        // props.webRTCContainerRef.current.streamElementAtReceiver = container;
-        
-        // // Mark this stream as processed
-        // props.webRTCContainerRef.current.processedStreams.add(streamId);
-      }
+                                    // props.webRTCContainerRef.current.streamElementAtReceiver = container;
 
-      // Only create separate audio element if:
-      // 1. It's an audio track AND
-      // 2. The stream has NO video track (standalone audio) AND
-      // 3. We haven't already processed this stream
-      if (event.track.kind === "audio" && 
-          !hasVideo && 
-          !props.webRTCContainerRef.current.processedStreams.has(streamId)) {
-        
-        console.log("Creating standalone audio element");
-        const audio = document.createElement("audio");
-        audio.srcObject = stream;
-        audio.autoplay = true;
-        audio.play().catch(e => console.error("Audio play error:", e));
-        
-        // Mark as processed
-        props.webRTCContainerRef.current.processedStreams.add(streamId);
-      }
-    };
+                                    // // Mark this stream as processed
+                                    // props.webRTCContainerRef.current.processedStreams.add(streamId);
+                                }
 
-    // Handle ICE candidates
-    pc.onicecandidate = (e) => {
-      if (e.candidate) {
-        props.socketContainer.current.send(JSON.stringify({
-          type: "query-message",
-          queryType: "ice",
-          sender: props.userRef.current,
-          receiver: props.userRef.current.focusedContact,
-          d: e.candidate
-        }));
-      }
-    };
+                                // Only create separate audio element if:
+                                // 1. It's an audio track AND
+                                // 2. The stream has NO video track (standalone audio) AND
+                                // 3. We haven't already processed this stream
+                                if (event.track.kind === "audio" &&
+                                    !hasVideo &&
+                                    !props.webRTCContainerRef.current.processedStreams.has(streamId)) {
 
-    // Handle connection state
-    pc.onconnectionstatechange = () => {
-      console.log("Connection state:", pc.connectionState);
+                                    console.log("Creating standalone audio element");
+                                    const audio = document.createElement("audio");
+                                    audio.srcObject = stream;
+                                    audio.autoplay = true;
+                                    audio.play().catch(e => console.error("Audio play error:", e));
 
-      if (pc.connectionState === "connected") {
-        console.log("WebRTC connected!");
-      }
+                                    // Mark as processed
+                                    props.webRTCContainerRef.current.processedStreams.add(streamId);
+                                }
+                            };
 
-      if (pc.connectionState === "failed" || pc.connectionState === "closed") {
-        if (props.webRTCContainerRef.current.streamElementAtReceiver) {
-          props.webRTCContainerRef.current.streamElementAtReceiver.remove();
-          props.webRTCContainerRef.current.streamElementAtReceiver = null;
-        }
-        if (props.webRTCContainerRef.current.senderStreamsObject) {
-          props.webRTCContainerRef.current.senderStreamsObject.getTracks().forEach(t => t.stop());
-        }
-        pc.close();
-        props.webRTCContainerRef.current.senderPC = null;
-      }
-    };
+                            // Handle ICE candidates
+                            pc.onicecandidate = (e) => {
+                                if (e.candidate) {
+                                    props.socketContainer.current.send(JSON.stringify({
+                                        type: "query-message",
+                                        queryType: "ice",
+                                        sender: props.userRef.current,
+                                        receiver: props.userRef.current.focusedContact,
+                                        d: e.candidate
+                                    }));
+                                }
+                            };
 
-    // Set remote description and create answer
-    await pc.setRemoteDescription(new RTCSessionDescription(data.d));
-    
-    // Process any queued ICE candidates
-    if (props.webRTCContainerRef.current.iceQueue?.length) {
-      for (const ice of props.webRTCContainerRef.current.iceQueue) {
-        try {
-          await pc.addIceCandidate(new RTCIceCandidate(ice));
-          console.log("Added queued ICE candidate");
-        } catch (e) {
-          console.error("Failed to add queued ICE:", e);
-        }
-      }
-      props.webRTCContainerRef.current.iceQueue = [];
-    }
+                            // Handle connection state
+                            pc.onconnectionstatechange = () => {
+                                
 
-    const answer = await pc.createAnswer();
-    await pc.setLocalDescription(answer);
+                                console.log("Connection state:", pc.connectionState);
 
-    props.socketContainer.current.send(JSON.stringify({
-      type: "query-message",
-      queryType: "answer",
-      sender: props.userRef.current,
-      receiver: props.userRef.current.focusedContact,
-      d: answer
-    }));
+                                if (pc.connectionState === "connected") {
+                                    console.log("WebRTC connected!");
+                                    console.log("✅ Peer connection SUCCESS!");
+                                    props.rtcbuttonRef.current.style.backgroundColor = "red";
 
-  } catch (err) {
-    console.error("Receiver WebRTC setup failed:", err);
-    alert("Failed to establish connection: " + err.message);
-  }
-  return;
-}
+                                    props.rtcbuttonRef.current.onclick = (e) => {
+                                        e.stopPropagation();
+                                        cleanup();
+                                    };
+                                }
+
+                                if (pc.connectionState === "failed" || pc.connectionState === "closed") {
+                                    cleanup();
+                                    if (props.webRTCContainerRef.current.streamElementAtReceiver) {
+                                        props.webRTCContainerRef.current.streamElementAtReceiver.remove();
+                                        props.webRTCContainerRef.current.streamElementAtReceiver = null;
+                                    }
+                                    if (props.webRTCContainerRef.current.senderStreamsObject) {
+                                        props.webRTCContainerRef.current.senderStreamsObject.getTracks().forEach(t => t.stop());
+                                    }
+                                    
+                                    props.webRTCContainerRef.current.senderPC = null;
+                                }
+                            };
+
+                            // Set remote description and create answer
+                            await pc.setRemoteDescription(new RTCSessionDescription(data.d));
+
+                            // Process any queued ICE candidates
+                            if (props.webRTCContainerRef.current.iceQueue?.length) {
+                                for (const ice of props.webRTCContainerRef.current.iceQueue) {
+                                    try {
+                                        await pc.addIceCandidate(new RTCIceCandidate(ice));
+                                        console.log("Added queued ICE candidate");
+                                    } catch (e) {
+                                        console.error("Failed to add queued ICE:", e);
+                                    }
+                                }
+                                props.webRTCContainerRef.current.iceQueue = [];
+                            }
+
+                            const answer = await pc.createAnswer();
+                            await pc.setLocalDescription(answer);
+
+                            props.socketContainer.current.send(JSON.stringify({
+                                type: "query-message",
+                                queryType: "answer",
+                                sender: props.userRef.current,
+                                receiver: props.userRef.current.focusedContact,
+                                d: answer
+                            }));
+
+                        } catch (err) {
+                            console.error("Receiver WebRTC setup failed:", err);
+                            alert("Failed to establish connection: " + err.message);
+                            cleanup()
+                        }
+                        return;
+                    }
 
 
                     if (data.query === "ice") {
@@ -944,7 +996,7 @@ el.autoplay = true;
                                 // const ttsTrack = textToSpeechContainerRef.current.outputStream.getAudioTracks()[0];
 
                                 props.textToSpeechContainerRef.current.forceSpeakWithCaptureAndStream(data.msg)
-                              
+
                                 return
                             } else {
                                 console.log("message came but init fucntion did not retrurn success so i cannot send audio")
@@ -1477,12 +1529,12 @@ el.autoplay = true;
                                     console.error("a recogniser for stt is already running")
                                     return
                                 }
-                              
+
 
                                 const ok = await startChromeOfflineVoiceRecognition(props.userRef)
 
                                 if (!ok) {
-                                   
+
                                     return console.error("no text to send")
                                 }
 
@@ -2185,12 +2237,12 @@ el.autoplay = true;
                 props.userRef.current.yourGlobalStarAiReference.isAiCallingOn.flag = true;
                 buttonEl.style.backgroundColor = "red"
                 const ok = await startChromeOfflineVoiceRecognition(props.userRef)
-                if(!ok){
+                if (!ok) {
                     // buttonEl.style.backgroundColor = "transparent"
                     return console.error("no text detected.")
                 }
                 //props.userRef.current.yourGlobalStarAiReference.isAiCallingOn.instance = await startChromeOfflineVoiceRecognition(props.userRef)
-               
+
 
             } catch (error) {
                 console.error("transripter is not working right now", error)
@@ -2502,7 +2554,8 @@ el.autoplay = true;
                         <fieldset>
 
                             <legend>Username</legend>
-                            <input required type="text" name="username" value={"" + Math.floor(Math.random() * 101)} />
+                            {/* <input required type="text" name="username" value={"" + Math.floor(Math.random() * 101)} /> */}
+                             <input required type="text" name="username" />
 
                         </fieldset>
 
