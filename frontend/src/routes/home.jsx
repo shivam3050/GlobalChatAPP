@@ -1445,7 +1445,7 @@ export function Home(props) {
 
 
                         const speakMessage = document.createElement("span")
-                        speakMessage.textContent = "⏵"
+                        speakMessage.textContent = "▶"
                         // give a class to it
                         speakMessage.classList.add("hovereffectbtn")
                         speakMessage.classList.add("playAnyMessageBtn")
