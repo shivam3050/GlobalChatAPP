@@ -298,7 +298,8 @@ function ChatsRoute(props) {
                             previewFloater.style.cssText = `
                                 display: inline-block;
                                 position: absolute;
-                                width: 132px;
+                                color: red;
+                                width: clamp(100px, 50%, 500px);
                                 height: calc(1.5*var(--nav-height));
                                 border: 1px dotted black;
                                 border-radius: 8px;
@@ -313,6 +314,23 @@ function ChatsRoute(props) {
                                 font-style: italic;
                                                             
                             `
+                            previewFloater.style.setProperty('--after-content', '"Preview"'); // or any string
+                            previewFloater.style.cssText += `
+    &::after {
+        content: var(--after-content);
+        position: absolute;
+        inset: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.1rem;
+        font-weight: bold;
+        color: rgba(255,0,0,0.7);
+        
+        pointer-events: none;
+        text-shadow: 0 0 6px white;
+    }
+`;
 
                             previewFloater.textContent = e.currentTarget.files[0].name
                             // previewFloater.classList.add("pickedFilePreview")
