@@ -1,4 +1,3 @@
-
 import { aiProfile, countries } from "../controllers/allCountries.js";
 import { useState } from "react";
 
@@ -7,13 +6,23 @@ import { Outlet, useNavigate } from "react-router-dom";
 import { useRef } from "react";
 
 import { startChromeOfflineVoiceRecognition } from "../utilitiesCompo/toolFunctions.js";
+import { socketStore } from "../zustand/socket.jsx";
+import { userStore } from "../zustand/userStore.jsx";
+import { chatStore } from "../zustand/chatStore.jsx";
+import { chatsDivRef, rtcbuttonRef, webRTCContainerRef, textToSpeechContainerRef } from "../utilitiesCompo/refs.js";
+import { webRTCStartFunction } from "../utilitiesCompo/webRTC.js";
 
 
 export function Home(props) {
 
-    // states to update only ui and none
-    const [selectedReceiver, setSelectedReceiver] = useState({ username: "", gender: "", age: null, id: "" })
+    // ---------- zustand subscriptions (these re-render Home when the value changes) ----------
+    const id = userStore(s => s.id)
+    const username = userStore(s => s.username)
+    const focusedContact = userStore(s => s.focusedContact)
+    const unreadCount = userStore(s => s.unreadCount)
 
+
+    // states to update only ui and none
     const [headerTitle, setHeaderTitle] = useState("Globet")
 
     const [toggleSelect, setToggleSelect] = useState(false)
@@ -28,31 +37,12 @@ export function Home(props) {
 
 
 
-
-
-
-
-
-    const navigate = useNavigate()
-
-
-
-
-
-
-
-
+    const navigate = useNavigate();
 
 
     const initializeConnection = (
-        e,
-        socketContainer,
-        user,
-        setUser,
-        userRef,
-        chatRef
+        e
     ) => {
-
 
 
         e.preventDefault()
@@ -62,8 +52,6 @@ export function Home(props) {
 
         const formData = new FormData(e.currentTarget);
         const username = formData.get("username")
-        // const age = formData.get("age")
-        // const gender = formData.get("gender")
         const country = formData.get("country")
         const label = e.currentTarget.lastElementChild;
 
@@ -81,42 +69,39 @@ export function Home(props) {
             }
         }
 
+        userStore.setState({ username: username, country: country })
 
+        if (socketStore.getState().isActive()) {
+            console.log("socket is already active")
+            setSignInLoadingFlag(false)
+            return;
+        }
 
-
-
-
-        try {
-            // socketContainer.current = new WebSocket(`${import.meta.env.VITE_BACKEND_WS_URL}/?username=${username}&age=${age}&gender=${gender}&country=${encodeURIComponent(country)}`)
-            socketContainer.current = new WebSocket(`${import.meta.env.VITE_BACKEND_WS_URL}/?username=${username}&country=${encodeURIComponent(country)}`)
-            socketContainer.current.binaryType = "arraybuffer";
-        } catch (error) {
-
+        if (!socketStore.getState().initSocket()) {
+            console.log("cannot init socket");
             setSignInLoadingFlag(false)
             setSignInErrorLog("unknown error")
-            console.error(error)
-            alert("socket is absent in home.jsx")
-            return
+            return;
         }
 
-        socketContainer.current.onopen = () => {
+        const socket = socketStore.getState().socket;
 
-        }
-
-        socketContainer.current.onclose = (event) => {
+        socket.onclose = (event) => {
             console.error(event.reason)
             setSignInLoadingFlag(false)
             setSignInErrorLog(event.reason)
-            return
-        }
-        socketContainer.current.onerror = (event) => {
+        };
+
+        socket.onerror = (event) => {
             console.error(event.reason)
             setSignInLoadingFlag(false)
             setSignInErrorLog(event.reason)
-            return
-        }
+        };
 
-        socketContainer.current.onmessage = async (message) => {
+        socket.onopen = () => {
+            console.log("Socket connected successfully");
+        };
+        socket.onmessage = async (message) => {
 
             if (typeof message.data === "string") {
 
@@ -132,33 +117,9 @@ export function Home(props) {
 
                 if (data.type === "register") {
 
-
-                    // set here full screen mode 
-                    // const elem = document.documentElement;
-                    // if (elem.requestFullscreen) {
-                    //     elem.requestFullscreen();
-                    // } else if (elem.webkitRequestFullscreen) { // Safari
-                    //     elem.webkitRequestFullscreen();
-                    // } else if (elem.msRequestFullscreen) { // IE11
-                    //     elem.msRequestFullscreen();
-                    // }
-
-                    //
-
-
-
-
-                    // here is the structure
-
-
-
-                    userRef.current = {
+                    userStore.setState({
 
                         username: data.username,
-
-                        // age: data.age,
-
-                        // gender: data.gender,
 
                         country: data.country,
 
@@ -177,8 +138,6 @@ export function Home(props) {
                             } : {
                                 username: "",
                                 id: "",
-                                // age: null,
-                                // gender: "",
                                 country: "",
                                 transcriptinput: "",
                                 isAiCallingOn: { instance: null, flag: false },
@@ -186,19 +145,14 @@ export function Home(props) {
                                 unread: false
                             },
 
-                        availableConnectedUsersUnreadLength: 0,
+                        unreadCount: 0,
 
                         availableUsers: data.availableUsers || [],
 
-                        availableConnectedUsers: []
-                    }
+                        availableConnectedUsers: {}
+                    })
                     console.log("first time variable set all users also there ,", data.availableUsers)
 
-
-
-
-
-                    setUser(data.username)
                     return
                 }
 
@@ -207,28 +161,17 @@ export function Home(props) {
                     if (data.query === "refresh-all-user") {
 
 
-                        userRef.current.availableUsers = data.msg || []
+                        userStore.setState({ availableUsers: data.msg || [] })
 
-                        console.log("from home route ", userRef.current.availableUsers)
+                        navigate("/users")
 
-
-
-                        if (userRef.current.availableUsers) {
-
-                            props.setRefreshGlobalUsersFlag(prev => prev + 1)
-
-                            navigate("/users")
-
-                            setHeaderTitle("Globet")
-
-                        }
+                        setHeaderTitle("Globet")
 
                         return
                     }
                     if (data.query === "chat-list-demand") {
 
-
-                        if (data.sender.id !== userRef.current.id) {
+                        if (data.sender.id !== userStore.getState().id) {
                             //this is not for me  which i have queried when click on a user
                             console.error("query respose is not for me, someone else queried")
                             return
@@ -236,21 +179,13 @@ export function Home(props) {
 
                         // this is my answer of query
 
-
-
-
-
                         if (data.status === "failed") {
 
-                            props.setChatsOverlay(true)
+                            chatStore.getState().setChatsOverlay(true)
 
-                            userRef.current.focusedContact = {}
+                            userStore.getState().setFocusedContact(data.receiver)
 
-                            chatRef.current.sender = data.sender;
-
-                            chatRef.current.receiver = data.receiver;
-
-                            chatRef.current.availableChats = []
+                            chatStore.getState().openChat(data.sender, data.receiver, [])
 
                             navigate("/chats")
 
@@ -259,725 +194,22 @@ export function Home(props) {
                             return
                         }
 
+                        chatStore.getState().setChatsOverlay(false)
 
-                        //below is for success
+                        userStore.getState().setFocusedContact(data.receiver)
 
-                        // here is the structure
+                        // contact opened, so its unread badge is cleared
+                        userStore.getState().markRead(data.receiver.id)
 
-                        props.setChatsOverlay(false)
-
-
-                        userRef.current.focusedContact = data.receiver
-
-                        setSelectedReceiver(userRef.current.focusedContact)
-
-                        chatRef.current.availableChats = []
-
-                        chatRef.current.sender = data.sender;
-
-                        chatRef.current.receiver = data.receiver;
-
-
-
-
-                        if (data.msg.length) {
-
-                            chatRef.current.availableChats = data.msg
-
-                        }
-                        console.log("home but chat part line 285,", chatRef.current.availableChats)
-
-
-
-
-                        setSelectedReceiver(userRef.current.focusedContact)
-
-
-                        props.setRefreshChatsFlag(prev => prev + 1)
+                        chatStore.getState().openChat(data.sender, data.receiver, (data.msg && data.msg.length) ? data.msg : [])
 
                         navigate("/chats")
-
-                        // userRef.current.availableUsers.unread = false
-
                         return
                     }
-
-                    // ==================== IN home.jsx ====================
-
-                    // Replace the "offer" query handler in home.jsx with this:
-                    if (data.query === "offer") {
-                        try {
-                            const cleanup = () => {
-                                    // Track cleanup
-                                    props.textToSpeechContainerRef.current.cleanUp()
-
-                                    if (props.webRTCContainerRef.current.senderTC) {
-                                        props.webRTCContainerRef.current.senderTC.stop();
-                                        // const el = props.webRTCContainerRef.current.streamElementAtReceiver;
-                                        // const parent = props.webRTCContainerRef.current.streamElementParentAtReceiver;
-                                        // if (el && parent && parent.contains(el)) parent.removeChild(el);
-                                        // props.webRTCContainerRef.current.streamElementAtReceiver = null;
-                                        props.webRTCContainerRef.current.senderTC = null;
-                                        console.log("Track cleaned up");
-                                    }
-                                    const el = props.webRTCContainerRef.current.streamElementAtReceiver;
-                                        const parent = props.webRTCContainerRef.current.streamElementParentAtReceiver;
-                                        if (el && parent && parent.contains(el)) parent.removeChild(el);
-                                        props.webRTCContainerRef.current.streamElementAtReceiver = null;
-
-                                    // Data channel cleanup
-                                    if (props.webRTCContainerRef.current.senderDC) {
-                                        props.webRTCContainerRef.current.senderDC.close();
-                                        props.webRTCContainerRef.current.senderDC = null;
-                                        console.log("Data channel closed");
-                                    }
-
-                                    // Peer connection cleanup
-                                    if (props.webRTCContainerRef.current.senderPC) {
-                                        props.webRTCContainerRef.current.senderPC.getSenders().forEach(sender => { if (sender.track) { sender.track.stop(); pc.removeTrack(sender); } });
-                                        props.webRTCContainerRef.current.senderPC.close();
-                                        props.webRTCContainerRef.current.senderPC = null;
-                                        console.log("Peer connection closed");
-                                    }
-
-                                    // Reset button
-                                    props.rtcbuttonRef.current.style.backgroundColor = "transparent";
-                                    props.rtcbuttonRef.current.onclick = () => {
-                                        props.webRTCContainerRef.current.webRTCStartFunction("mediastream");
-                                    };
-
-
-                                };
-                            if (props.webRTCContainerRef.current.senderPC) {
-                                alert("Sorry, already a connection");
-                                return;
-                            }
-
-                            console.log("Offer received, creating peer connection");
-
-                            const pc = new RTCPeerConnection({
-                                iceServers: [
-                                    { urls: 'stun:stun.l.google.com:19302' },
-                                    { urls: 'stun:stun1.l.google.com:19302' }
-                                ]
-                            });
-                            props.webRTCContainerRef.current.senderPC = pc;
-
-                            // Get user media
-                            let stream;
-                            try {
-                                stream = await navigator.mediaDevices.getUserMedia({
-                                    video: {
-                                        facingMode: 'user',
-                                        width: { ideal: 1280 },
-                                        height: { ideal: 720 }
-                                    },
-                                    audio: {
-                                        echoCancellation: true,
-                                        noiseSuppression: true,
-                                        autoGainControl: true
-                                    }
-                                });
-                                props.webRTCContainerRef.current.senderStreamsObject = stream;
-                            } catch (err) {
-                                alert("Camera/microphone access denied: " + err.message);
-                                pc.close();
-                                props.webRTCContainerRef.current.senderPC = null;
-                                return;
-                            }
-
-
-                            // Add tracks
-                            stream.getTracks().forEach(track => {
-                                pc.addTrack(track, stream);
-                            });
-                            const { success, reused } = await props.textToSpeechContainerRef.current.initAudioCaptureFunction()
-                            if (success) {
-                                const ttsStream = props.textToSpeechContainerRef.current.outputStream
-                                const ttsTrack = ttsStream.getTracks()[0]
-                                pc.addTrack(ttsTrack, ttsStream)
-                                // ab later tum speak krwa dena ye on ho chuka hai, forceSpeakWithCaptureAndStream isko call krna hai  bas
-                            }
-
-                            // Track which streams have been processed
-                            if (!props.webRTCContainerRef.current.processedStreams) {
-                                props.webRTCContainerRef.current.processedStreams = new Set();
-                            }
-
-                            // Handle incoming tracks
-                            pc.ontrack = (event) => {
-                                console.log("Track received at receiver:", event.track.kind);
-                                const stream = event.streams[0];
-                                const streamId = stream.id;
-
-                                // Check if stream has video track
-                                const hasVideo = stream.getVideoTracks().length > 0;
-
-                                if (event.track.kind === "video") {
-                                    //video is coming
-                                    if (props.webRTCContainerRef.current.streamElementAtReceiver?.parentNode) {
-                                        props.webRTCContainerRef.current.streamElementAtReceiver.remove();
-                                    }
-
-                                    const el = document.createElement(event.track.kind);
-                                    el.style.zIndex = "20";
-                                    el.style.width = "100%";
-                                    el.style.borderRadius = "calc(5*var(--med-border-radius))"
-                                    el.autoplay = true;
-                                    el.controls = true;
-                                    el.playsInline = true;
-                                    el.srcObject = event.streams[0];
-                                    el.muted = true;
-                                    el.playsInline = true;
-                                    el.autoplay = true;
-
-                                    const videoDivAndSTTBtnContainer = document.createElement("section")
-                                    videoDivAndSTTBtnContainer.style.width = "clamp(100px,80%,400px)";
-                                    videoDivAndSTTBtnContainer.style.boxShadow = "1px 1px 2px 1px black";
-                                    videoDivAndSTTBtnContainer.style.border = "1px solid black";
-                                    // lets create a voice capturer for speech to text
-                                    const button = document.createElement("button")
-                                    videoDivAndSTTBtnContainer.appendChild(el) // this is the video element
-                                    videoDivAndSTTBtnContainer.appendChild(button) // this is stt button
-
-
-                                    props.webRTCContainerRef.current.streamElementAtReceiver = videoDivAndSTTBtnContainer;
-                                    props.webRTCContainerRef.current.senderTC = event.track;
-
-
-
-
-
-
-
-
-                                    const parent = document.getElementById("chats-div"); // THIS NEEDS TO BE CHANGED WHERE YOU WANT TO PUT THIS ELEMENT OF RECEIVER SIDE
-
-                                    const startVoiceCaptureForSTT = async () => {
-
-                                        if (props.recogniserStreamObjectRef && props.recogniserStreamObjectRef?.current?.recogniser) {
-                                            console.error("a recogniser for stt is already running")
-                                            return false
-                                        }
-
-
-
-                                        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-
-                                        const recogniser = new SpeechRecognition()
-
-                                        props.recogniserStreamObjectRef.current = { recogniser: recogniser, stoppedByUser: false, finalText: "", isARequestMadeBySTT: false }
-
-                                        recogniser.continuous = true;
-                                        recogniser.interimResults = false;
-
-                                        recogniser.onresult = (event) => {
-                                            console.log("on result fired")
-
-
-                                            const currentFinalPhraseIndex = event.results.length - 1
-
-                                            console.log(event.results)
-
-                                            // SpeechRecognitionResultList[
-                                            //     {
-                                            //         transcript: "it is again working",
-                                            //         confidence: 0.8295,
-                                            //         isFinal: true
-                                            //     },
-                                            //     {
-                                            //         transcript: " started",
-                                            //         confidence: 0.8869,
-                                            //         isFinal: true
-                                            //     },
-                                            //     {
-                                            //         transcript: " started",
-                                            //         confidence: 0.8494,
-                                            //         isFinal: true
-                                            //     },
-                                            //     {
-                                            //         transcript: " recognise",
-                                            //         confidence: 0.8359,
-                                            //         isFinal: true
-                                            //     }
-                                            // ]
-
-
-
-                                            // console.log(event.results[0].isFinal)
-                                            // console.log(event.results[0][0].transcript)
-
-                                            if (event.results[currentFinalPhraseIndex].isFinal) { // this check is for api basis
-                                                props.recogniserStreamObjectRef.current.finalText += " " + event.results[currentFinalPhraseIndex][0].transcript;
-
-                                                console.log("Final captured text :  ", props.recogniserStreamObjectRef.current.finalText)
-
-                                                // if(props.webRTCContainerRef.current.recogniserStreamObject.stoppedByUser){ // user stopped capture button and response came later, this is the condition
-                                                props.recogniserStreamObjectRef.current.isARequestMadeBySTT = false
-                                                // } 
-
-
-
-                                            } else {
-                                                console.log("this was not is isFinal, ignore")
-                                                // ignore, due to api basis
-                                            }
-                                        }
-                                        recogniser.onend = () => {
-                                            if (!props.recogniserStreamObjectRef.current.stoppedByUser) {
-
-                                                try {
-                                                    recogniser.start()
-                                                    props.recogniserStreamObjectRef.current.isARequestMadeBySTT = true
-
-                                                } catch (error) {
-                                                    console.log(error)
-                                                }
-                                            }
-
-                                        }
-                                        recogniser.onerror = (e) => {
-                                            console.error("Error:", e.error);
-                                        };
-                                        recogniser.onabort = (e) => {
-                                            props.recogniserStreamObjectRef.current.recogniser.stream.getTracks().forEach(track => track.stop());
-                                            props.recogniserStreamObjectRef.current.recogniser.onresult = null
-                                            props.recogniserStreamObjectRef.current.recogniser.onend = null
-                                            props.recogniserStreamObjectRef.current.recogniser.onerror = null
-                                            props.recogniserStreamObjectRef.current.recogniser = null
-                                            props.recogniserStreamObjectRef.current.stoppedByUser = true
-                                            props.recogniserStreamObjectRef.current = null
-                                        }
-
-
-
-                                        try {
-                                            recogniser.start()
-                                            props.recogniserStreamObjectRef.current.isARequestMadeBySTT = true
-                                            return true
-                                        } catch (error) {
-                                            return false
-                                        }
-
-
-                                    }
-                                    button.textContent = "Start STT"
-                                    //lets have some css
-                                    // button.style.background = "#16a34a"
-                                    button.classList.add("hovereffectbtn")
-                                    button.classList.add("elementOnwhichStartStopSTT")
-
-                                    const resumeVoiceCapture = (elementOnwhichIsFlagOCapturing) => {
-                                        if (!props.recogniserStreamObjectRef.current?.stoppedByUser) {
-                                            console.error("not stopped by user, so cannot start")
-                                            return
-                                        };
-                                        try {
-
-                                            const recogniser = props.recogniserStreamObjectRef.current?.recogniser
-                                            if (!recogniser) {
-                                                console.error("recogniser already not exists")
-                                                return
-                                            }
-                                            recogniser.start();
-                                            props.recogniserStreamObjectRef.current.isARequestMadeBySTT = true
-                                            props.recogniserStreamObjectRef.current.stoppedByUser = false
-
-                                            elementOnwhichIsFlagOCapturing.textContent = "Stop STT"
-                                            // elementOnwhichIsFlagOCapturing.style.backgroundColor = "#16a34a"
-                                            elementOnwhichIsFlagOCapturing.style.boxShadow = "1px 1px 1px 1px green";
-                                            elementOnwhichIsFlagOCapturing.onclick = () => pauseVoiceCapture(elementOnwhichIsFlagOCapturing)
-
-                                        } catch (error) {
-                                            elementOnwhichIsFlagOCapturing.textContent = "Start STT"
-                                            elementOnwhichIsFlagOCapturing.style.backgroundColor = "#1f2937"
-                                            elementOnwhichIsFlagOCapturing.style.boxShadow = "1px 1px 1px 1px black";
-                                            elementOnwhichIsFlagOCapturing.onclick = () => resumeVoiceCapture(elementOnwhichIsFlagOCapturing)
-
-                                        }
-                                    }
-                                    const pauseVoiceCapture = async (elementOnwhichIsFlagOCapturing) => {
-                                        const recogniser = props.recogniserStreamObjectRef.current?.recogniser
-                                        if (!recogniser) {
-                                            console.error("recogniser already not exists")
-                                            return
-                                        }
-                                        try {
-                                            recogniser.stop()
-
-
-                                        } catch (error) {
-                                            console.error(error)
-                                            return
-                                        }
-
-
-                                        elementOnwhichIsFlagOCapturing.textContent = "Start STT"
-                                        elementOnwhichIsFlagOCapturing.style.backgroundColor = "#1f2937"
-                                        elementOnwhichIsFlagOCapturing.style.boxShadow = "1px 1px 1px 1px black";
-                                        props.recogniserStreamObjectRef.current.stoppedByUser = true
-
-                                        // i will add a slight delay
-
-                                        //polling
-
-                                        let loopcounter = 0
-                                        while (props.recogniserStreamObjectRef.current.isARequestMadeBySTT) { // this condition will break loop if the onresult last response arrived
-                                            if (loopcounter >= 50) { break }; // this is terminating hardly after 5 seconds preventing very long polling
-
-                                            await new Promise((resolve) => { // this way i am reducing the high cpu usage of while loop, and nothing else the use of promise
-                                                setTimeout(resolve, 100)
-                                                loopcounter++;
-                                            })
-
-                                        }
-
-
-                                        if (props.recogniserStreamObjectRef.current.finalText.length !== 0) {
-
-                                            //****************** */ OR HERE I HAVE FINALLY THE EXTRACTED TEXT FORM NOW I CAN DO WHATERVER WITH TEXT ***********************
-
-                                            const scannedText = document.createElement("div")
-                                            scannedText.textContent = props.recogniserStreamObjectRef.current.finalText
-                                            //props.textToSpeechContainerRef.current.forceSpeakFunction(props.recogniserStreamObject.current.finalText)
-                                            parent.appendChild(scannedText) // i am temporary appending in the chatsdiv these messages
-                                            try {
-                                                socketContainer.current.send(JSON.stringify({
-                                                    type: "message",
-                                                    messageSubType: "triple-text-to-ai",
-                                                    message: props.webRTCContainerRef.current.recogniserStreamObjectRef.finalText,
-                                                    sender: {
-                                                        username: props.userRef.current.username,
-                                                        id: props.userRef.current.id,
-                                                        country: props.userRef.current.country,
-                                                        customAccessToken: props.userRef.current.customAccessToken
-                                                    },
-                                                    receiver: props.userRef.current.yourGlobalStarAiReference,
-
-                                                }));
-                                            } catch (err) {
-
-                                                console.error("cannot send this triple message", err);
-                                            }
-                                            // await props.textToSpeechContainerRef.current.forceSpeakWithCaptureAndStream(props.recogniserStreamObjectRef.current.finalText)
-                                        }
-
-                                        props.recogniserStreamObjectRef.current.finalText = "";
-
-                                        elementOnwhichIsFlagOCapturing.onclick = () => resumeVoiceCapture(elementOnwhichIsFlagOCapturing)
-
-                                    }
-
-                                    button.onclick = async (e) => {
-
-                                        if (await startVoiceCaptureForSTT()) { // this is starting first time
-
-
-
-                                            button.onclick = () => pauseVoiceCapture(button)
-                                            button.textContent = "Stop STT"
-                                            // button.style.backgroundColor = "#16a34a"
-                                            button.style.boxShadow = "1px 1px 1px 1px green";
-                                        } else {
-                                            button.textContent = "Start STT"
-                                            button.style.backgroundColor = "#1f2937"
-                                            button.style.boxShadow = "1px 1px 1px 1px black";
-                                        }
-
-
-
-
-                                    }
-
-
-                                    props.webRTCContainerRef.current.streamElementParentAtReceiver = parent;
-
-                                    if (parent) {
-
-                                        parent.appendChild(videoDivAndSTTBtnContainer);
-
-
-
-                                    };
-
-                                    return
-                                    // if (props.webRTCContainerRef.current.streamElementAtReceiver) {
-                                    //   return;
-                                    // }
-
-                                    // const video = document.createElement("video");
-                                    // video.srcObject = stream; // Entire stream (includes both video and audio)
-                                    // video.autoplay = true;
-                                    // video.playsInline = true;
-                                    // video.muted = false;
-                                    // video.controls = false;
-                                    // video.style.width = "100%";
-                                    // video.style.borderRadius = "calc(5*var(--med-border-radius))";
-
-                                    // video.play().catch(e => {
-                                    //   console.error("Video play error:", e);
-                                    //   video.onclick = () => video.play();
-                                    // });
-
-                                    // const container = document.createElement("section");
-                                    // container.style.width = "clamp(100px, 80%, 400px)";
-                                    // container.style.position = "relative";
-
-                                    // const closeBtn = document.createElement("button");
-                                    // closeBtn.textContent = "✖";
-                                    // closeBtn.style.position = "absolute";
-                                    // closeBtn.style.top = "10px";
-                                    // closeBtn.style.right = "10px";
-                                    // closeBtn.style.zIndex = "30";
-                                    // closeBtn.style.backgroundColor = "red";
-                                    // closeBtn.style.color = "white";
-                                    // closeBtn.style.border = "none";
-                                    // closeBtn.style.borderRadius = "50%";
-                                    // closeBtn.style.width = "30px";
-                                    // closeBtn.style.height = "30px";
-                                    // closeBtn.style.cursor = "pointer";
-                                    // closeBtn.onclick = () => {
-                                    //   if (props.webRTCContainerRef.current.senderPC) {
-                                    //     props.webRTCContainerRef.current.senderPC.close();
-                                    //     props.webRTCContainerRef.current.senderPC = null;
-                                    //   }
-                                    //   if (props.webRTCContainerRef.current.senderStreamsObject) {
-                                    //     props.webRTCContainerRef.current.senderStreamsObject.getTracks().forEach(t => t.stop());
-                                    //   }
-                                    //   container.remove();
-                                    //   props.webRTCContainerRef.current.streamElementAtReceiver = null;
-                                    // };
-
-                                    // container.appendChild(video);
-                                    // container.appendChild(closeBtn);
-
-                                    // const parent = document.getElementById("chats-div");
-                                    // if (parent) {
-                                    //   parent.appendChild(container);
-                                    //   parent.scrollTo({ top: parent.scrollHeight, behavior: 'smooth' });
-                                    // }
-
-                                    // props.webRTCContainerRef.current.streamElementAtReceiver = container;
-
-                                    // // Mark this stream as processed
-                                    // props.webRTCContainerRef.current.processedStreams.add(streamId);
-                                }
-
-                                // Only create separate audio element if:
-                                // 1. It's an audio track AND
-                                // 2. The stream has NO video track (standalone audio) AND
-                                // 3. We haven't already processed this stream
-                                if (event.track.kind === "audio" &&
-                                    !hasVideo &&
-                                    !props.webRTCContainerRef.current.processedStreams.has(streamId)) {
-
-                                    console.log("Creating standalone audio element");
-                                    const audio = document.createElement("audio");
-                                    audio.srcObject = stream;
-                                    audio.autoplay = true;
-                                    audio.play().catch(e => console.error("Audio play error:", e));
-
-                                    // Mark as processed
-                                    props.webRTCContainerRef.current.processedStreams.add(streamId);
-                                }
-                            };
-
-                            // Handle ICE candidates
-                            pc.onicecandidate = (e) => {
-                                if (e.candidate) {
-                                    props.socketContainer.current.send(JSON.stringify({
-                                        type: "query-message",
-                                        queryType: "ice",
-                                        sender: props.userRef.current,
-                                        receiver: props.userRef.current.focusedContact,
-                                        d: e.candidate
-                                    }));
-                                }
-                            };
-
-                            // Handle connection state
-                            pc.onconnectionstatechange = () => {
-                                
-
-                                console.log("Connection state:", pc.connectionState);
-
-                                if (pc.connectionState === "connected") {
-                                    console.log("WebRTC connected!");
-                                    console.log("✅ Peer connection SUCCESS!");
-                                    props.rtcbuttonRef.current.style.backgroundColor = "red";
-
-                                    props.rtcbuttonRef.current.onclick = (e) => {
-                                        e.stopPropagation();
-                                        cleanup();
-                                    };
-                                }
-
-                                if (pc.connectionState === "failed" || pc.connectionState === "closed") {
-                                    cleanup();
-                                    if (props.webRTCContainerRef.current.streamElementAtReceiver) {
-                                        props.webRTCContainerRef.current.streamElementAtReceiver.remove();
-                                        props.webRTCContainerRef.current.streamElementAtReceiver = null;
-                                    }
-                                    if (props.webRTCContainerRef.current.senderStreamsObject) {
-                                        props.webRTCContainerRef.current.senderStreamsObject.getTracks().forEach(t => t.stop());
-                                    }
-                                    
-                                    props.webRTCContainerRef.current.senderPC = null;
-                                }
-                            };
-
-                            // Set remote description and create answer
-                            await pc.setRemoteDescription(new RTCSessionDescription(data.d));
-
-                            // Process any queued ICE candidates
-                            if (props.webRTCContainerRef.current.iceQueue?.length) {
-                                for (const ice of props.webRTCContainerRef.current.iceQueue) {
-                                    try {
-                                        await pc.addIceCandidate(new RTCIceCandidate(ice));
-                                        console.log("Added queued ICE candidate");
-                                    } catch (e) {
-                                        console.error("Failed to add queued ICE:", e);
-                                    }
-                                }
-                                props.webRTCContainerRef.current.iceQueue = [];
-                            }
-
-                            const answer = await pc.createAnswer();
-                            await pc.setLocalDescription(answer);
-
-                            props.socketContainer.current.send(JSON.stringify({
-                                type: "query-message",
-                                queryType: "answer",
-                                sender: props.userRef.current,
-                                receiver: props.userRef.current.focusedContact,
-                                d: answer
-                            }));
-
-                        } catch (err) {
-                            console.error("Receiver WebRTC setup failed:", err);
-                            alert("Failed to establish connection: " + err.message);
-                            cleanup()
-                        }
-                        return;
-                    }
-
-
-                    if (data.query === "ice") {
-                        const pc = props.webRTCContainerRef.current.senderPC;
-
-                        if (!pc) {
-                            console.error("No peer connection to add ICE candidate to");
-                            // alert("No peer connection to add ICE candidate to")
-                            return;
-                        }
-
-                        try {
-                            // Agar remote description nahi hai, ICE candidate ko queue me daal do
-                            if (!pc.remoteDescription || !pc.remoteDescription.type) {
-                                if (!props.webRTCContainerRef.current.iceQueue) {
-                                    props.webRTCContainerRef.current.iceQueue = [];
-                                }
-                                props.webRTCContainerRef.current.iceQueue.push(data.d);
-                                console.log("Remote description not set yet, ICE queued", data.d);
-                                //  alert("Remote description not set yet, ICE queued")
-                            } else {
-                                await pc.addIceCandidate(new RTCIceCandidate(data.d));
-                                console.log("ICE candidate added successfully:", data.d);
-
-                            }
-                        } catch (err) {
-                            console.error("Failed to add ICE candidate:", err);
-                            // alert("Failed to add ICE candidate:")
-                        }
-                        return;
-                    }
-
-
-                    if (data.query === "answer") {
-                        const pc = props.webRTCContainerRef.current.senderPC;
-
-                        if (!pc) {
-                            console.error("Cannot set remote description: peer connection missing");
-                            // alert("Cannot set remote description: peer connection missing")
-                            return;
-                        }
-
-                        try {
-                            await pc.setRemoteDescription(new RTCSessionDescription(data.d));
-                            console.log("Remote description (answer) applied");
-
-
-
-                            // Agar ICE candidates queue me hain, ab unhe add karo
-                            if (props.webRTCContainerRef.current.iceQueue?.length) {
-                                for (const ice of props.webRTCContainerRef.current.iceQueue) {
-                                    try {
-                                        await pc.addIceCandidate(new RTCIceCandidate(ice));
-                                        console.log("Queued ICE candidate added:", ice);
-                                    } catch (e) {
-                                        console.error("Failed to add queued ICE:", e);
-                                        // alert("Failed to add queued ICE:")
-                                    }
-                                }
-                                // Clear queue
-                                props.webRTCContainerRef.current.iceQueue = [];
-                            }
-                        } catch (err) {
-                            console.error("Failed to set remote description (answer):", err);
-                            // alert("Failed to set remote description (answer):")
-                        }
-                        return;
-                    }
-
-
-                    // if (data.query === "ice") {
-
-
-
-                    //     if (!props.webRTCContainerRef.current.senderPC) {
-                    //         console.error("No peer connection to add ICE candidate to");
-                    //         return;
-                    //     }
-
-                    //     try {
-                    //         console.log("came in try case")
-                    //         console.log("consoling data.d in query ice, ", data.d)
-                    //         await props.webRTCContainerRef.current.senderPC.addIceCandidate(new RTCIceCandidate(data.d));
-                    //         console.log("ICE candidate added successfully");
-                    //     } catch (err) {
-                    //         console.error("Failed to add ICE candidate:", err);
-                    //     }
-                    //     return
-                    // }
-                    // if (data.query === "answer") {
-
-                    //     if (!props.webRTCContainerRef.current.senderPC) {
-                    //         console.error("cannot continue in this answer query.")
-                    //         return
-
-                    //     };
-
-                    //     // Set the remote description so WebRTC can finalize the connection
-                    //     props.webRTCContainerRef.current.senderPC.setRemoteDescription(new RTCSessionDescription(data.d))
-                    //         .then(() => {
-                    //             console.log("Remote description (answer) applied, connection should complete");
-                    //         })
-                    //         .catch(err => console.error("Failed to set remote description:", err));
-
-                    //     return
-                    // }
-                    console.error("invalid query but valid type in the respnse")
-                    // alert("invalid query but valid type in the respnse")
-                    return
                 }
-
                 if (data.type === "message") {
 
-
-
-
-
-                    if (data.sender.id === userRef.current.id) {
+                    if (data.sender.id === userStore.getState().id) {
                         // this means i sent a message and its response came to me
                         // i wil only check file conditions which i send to someone as its reponces will come from server only to me 
                         // no need to check logs of sending file any where other than this scope
@@ -990,20 +222,18 @@ export function Home(props) {
                                 return console.log("failed msg with type message submsgtype triple text from ai", data.msg)
                             }
                             // whether initialised the tts audio stream or not
-                            const { success, reused } = await props.textToSpeechContainerRef.current.initAudioCaptureFunction(); // dont fear about init, if it already exists, it will not reinite it will just use the same
+                            const { success, reused } = await textToSpeechContainerRef.current.initAudioCaptureFunction(); // dont fear about init, if it already exists, it will not reinite it will just use the same
                             if (success) {
                                 console.log("message came and int function returned success whwen i was trying send its audio")
                                 // const ttsTrack = textToSpeechContainerRef.current.outputStream.getAudioTracks()[0];
 
-                                props.textToSpeechContainerRef.current.forceSpeakWithCaptureAndStream(data.msg)
-
+                                textToSpeechContainerRef.current.forceSpeakWithCaptureAndStream(data.msg)
                                 return
                             } else {
                                 console.log("message came but init fucntion did not retrurn success so i cannot send audio")
                             }
 
-                            //props.textToSpeechContainerRef.current.forceSpeakWithCaptureAndStream(data.msg)
-
+                            //textToSpeechContainerRef.current.forceSpeakWithCaptureAndStream(data.msg)
 
 
 
@@ -1017,7 +247,7 @@ export function Home(props) {
 
                             console.error("your msg has been failed", data.msg)
 
-                            const chatsDiv = props.chatsDivRef.current
+                            const chatsDiv = chatsDivRef.current
 
 
                             const pendinGlobetFields = chatsDiv.querySelectorAll(".newly-unupdated-chats")
@@ -1034,36 +264,14 @@ export function Home(props) {
 
 
 
-
-
-
-
                         // this part is now for success normal messages
 
-                        // checks if receiver already in my contacts or not
-                        if (!(userRef.current.availableConnectedUsers.some((obj) => (obj.id === data.receiver.id)))) {
-
-                            // this is means not present
-
-
-                            userRef.current.availableConnectedUsers.push(
-                                {
-
-                                    username: data.receiver.username,
-                                    // age: data.receiver.age,
-                                    // gender: data.receiver.gender,
-                                    country: data.receiver.country,
-                                    id: data.receiver.id,
-                                    unread: false
-
-                                }
-                            )
-
-                        }
+                        // adds receiver in my contacts if not already there (does nothing if present)
+                        userStore.getState().addContact(data.receiver)
 
 
 
-                        const chatsDiv = props.chatsDivRef.current
+                        const chatsDiv = chatsDivRef.current
 
 
                         const pendinGlobetFields = chatsDiv.querySelectorAll(".newly-unupdated-chats")
@@ -1092,11 +300,11 @@ export function Home(props) {
                         return
                     }
 
-                    if (data.sender.id === userRef.current.focusedContact?.id) {
+                    if (data.sender.id === userStore.getState().focusedContact.id) {
 
                         // ai is the sender , must listen 
                         //calling
-                        if (data.status === "calling" && props.userRef.current.yourGlobalStarAiReference.isAiCallingOn.flag) {
+                        if (data.status === "calling" && userStore.getState().yourGlobalStarAiReference.isAiCallingOn.flag) {
                             //play instantly
                             // filter little bit
 
@@ -1119,7 +327,7 @@ export function Home(props) {
                             }
 
                             // await speakWithChromeOfflineSynthesizer(filteredText)
-                            props.textToSpeechContainerRef.current.forceSpeakFunction(filteredText.replace(/\*/g, '').trim())
+                            textToSpeechContainerRef.current.forceSpeakFunction(filteredText.replace(/\*/g, '').trim())
                             // speaking call again listening function
 
                             await startChromeOfflineVoiceRecognition(props.userRef)
@@ -1137,7 +345,7 @@ export function Home(props) {
                         if (data.status === "typing" && data.sender.username === "StarAI") {
 
 
-                            const chatsDiv = props.chatsDivRef.current
+                            const chatsDiv = chatsDivRef.current
 
                             if (typingFlagRef.current.element) {
 
@@ -1149,6 +357,7 @@ export function Home(props) {
                                     if (typingFlagRef.current.element && chatsDiv.contains(typingFlagRef.current.element)) {
                                         chatsDiv.removeChild(typingFlagRef.current.element)
                                     }
+                                    typingFlagRef.current.element = null
 
                                 }, 10000)
 
@@ -1193,9 +402,10 @@ export function Home(props) {
 
                             typingFlagRef.current.setTimeoutId = setTimeout(() => {
 
-                                if (typingFlagRef.current.element) {
+                                if (typingFlagRef.current.element && chatsDiv.contains(typingFlagRef.current.element)) {
                                     chatsDiv.removeChild(typingFlagRef.current.element)
                                 }
+                                typingFlagRef.current.element = null
 
                             }, 10000)
 
@@ -1220,26 +430,17 @@ export function Home(props) {
                         // actaul msg from starAi
                         if (data.sender.username === "StarAI") {
                             // removing typing flag if any came then.
-                            const chatsDiv = props.chatsDivRef.current
+                            const chatsDiv = chatsDivRef.current
 
                             if (typingFlagRef.current.element && chatsDiv.contains(typingFlagRef.current.element)) {
 
                                 clearTimeout(typingFlagRef.current.setTimeoutId)
                                 chatsDiv.removeChild(typingFlagRef.current.element)
                                 typingFlagRef.current.element = null
-                                typingFlagRef.current.setTimeoutId
+                                typingFlagRef.current.setTimeoutId = null
 
 
                             }
-
-
-
-
-
-
-
-
-
 
 
                             const date = new Date(Number(data.createdAt))
@@ -1249,8 +450,6 @@ export function Home(props) {
                                 minute: "2-digit",
                                 hour12: true,
                             });
-
-
 
 
                             // NEW CONCEPT
@@ -1282,13 +481,13 @@ export function Home(props) {
                                     const modelPart = line.split('modelResponse:')[1].trim();
 
 
-                                    props.chatRef.current?.starAiRecentChatContextStack.push(
+                                    chatStore.getState().starAiRecentChatContextStack.push(
                                         {
                                             "role": "user",
                                             "parts": [{ "text": userPart }]
                                         }
                                     )
-                                    props.chatRef.current?.starAiRecentChatContextStack.push(
+                                    chatStore.getState().starAiRecentChatContextStack.push(
                                         {
                                             "role": "model",
                                             "parts": [{ "text": modelPart }]
@@ -1303,8 +502,6 @@ export function Home(props) {
                                     const strong = document.createElement("legend")
 
 
-
-
                                     const onClick = (count) => {
 
 
@@ -1314,7 +511,6 @@ export function Home(props) {
 
                                         }
                                         window.navigator.clipboard.writeText(text)
-
 
 
                                     }
@@ -1330,7 +526,7 @@ export function Home(props) {
                                     strong.style.borderTopLeftRadius = "10px"
                                     strong.style.borderTopRightRadius = "10px"
                                     strong.style.color = "white"
-                                    strong.display = "inline"
+                                    strong.style.display = "inline"
                                     const count = i
                                     strong.onclick = () => onClick(count)
                                     chatTextField.appendChild(strong)
@@ -1350,12 +546,7 @@ export function Home(props) {
                                     const codeLine = document.createElement("div")
                                     codeLine.classList.add("codeLine")
                                     codeLine.classList.add(`codeLine${i}`)
-                                    let indexOfComment = line.indexOf("//")
-                                    let comment = ""
-                                    if (indexOfComment !== -1) {
-                                        comment = line.slice(indexOfComment)
-                                        line = line.slice(0, indexOfComment)
-                                    }
+                                    // full line is kept (comments and urls are no longer cut)
                                     codeLine.textContent = line
                                     chatTextField.appendChild(codeLine)
 
@@ -1370,7 +561,7 @@ export function Home(props) {
                                     continue
                                 }
 
-                                if (!startCode && line.slice(0, 3) === line.slice(-2) && line.indexOf("**") !== -1) {
+                                if (!startCode && line.length > 4 && line.slice(0, 2) === "**" && line.slice(-2) === "**") {
                                     const strong = document.createElement("strong")
                                     strong.textContent = line
                                     chatTextField.appendChild(strong)
@@ -1384,12 +575,6 @@ export function Home(props) {
                                     chatTextField.appendChild(div)
                                     continue
                                 }
-
-
-
-
-
-
 
 
 
@@ -1410,11 +595,6 @@ export function Home(props) {
                             //NEW CONCEPT END
 
 
-
-
-
-
-
                             return
                         }
 
@@ -1422,8 +602,7 @@ export function Home(props) {
                         //actual msg from focused otther than ai
 
 
-
-                        const chatsDiv = props.chatsDivRef.current
+                        const chatsDiv = chatsDivRef.current
                         const date = new Date(Number(data.createdAt))
 
                         const createdAt = date.toLocaleTimeString("en-IN", {
@@ -1445,11 +624,11 @@ export function Home(props) {
 
 
                         const speakMessage = document.createElement("span")
-                        speakMessage.textContent = "▶"
+                        speakMessage.textContent = "⏵"
                         // give a class to it
                         speakMessage.classList.add("hovereffectbtn")
                         speakMessage.classList.add("playAnyMessageBtn")
-                        speakMessage.onclick = () => props.textToSpeechContainerRef.current.forceSpeakFunction(data.msg)
+                        speakMessage.onclick = () => textToSpeechContainerRef.current.forceSpeakFunction(data.msg)
 
                         chatTextField.appendChild(speakMessage)
 
@@ -1469,19 +648,16 @@ export function Home(props) {
 
                         chatsDiv?.scrollTo({ top: chatsDiv?.scrollHeight, behavior: 'smooth' })
 
-
-
-
-
+                        return
 
                     }
 
 
-                    if (data.receiver && data.sender.id !== userRef.current.focusedContact?.id) {
+                    if (data.sender.id !== userStore.getState().focusedContact.id) {
 
 
                         // ai is the sender , must listen 
-                        if (data.status === "calling" && props.userRef.current.yourGlobalStarAiReference.isAiCallingOn.flag) {
+                        if (data.status === "calling" && userStore.getState().yourGlobalStarAiReference.isAiCallingOn.flag) {
                             //play instantly
                             // filter little bit
 
@@ -1501,13 +677,13 @@ export function Home(props) {
                                         const userPart = line.split('userRequest:')[1].split('modelResponse:')[0].trim();
                                         const modelPart = line.split('modelResponse:')[1].trim();
 
-                                        props.chatRef.current?.starAiRecentVoiceContextStack.push(
+                                        chatStore.getState().starAiRecentVoiceContextStack.push(
                                             {
                                                 "role": "user",
                                                 "parts": [{ "text": userPart }]
                                             }
                                         )
-                                        props.chatRef.current?.starAiRecentVoiceContextStack.push(
+                                        chatStore.getState().starAiRecentVoiceContextStack.push(
                                             {
                                                 "role": "model",
                                                 "parts": [{ "text": modelPart }]
@@ -1521,11 +697,11 @@ export function Home(props) {
                                 // console.log(filteredText)
 
 
-                                await props.textToSpeechContainerRef.current.forceSpeakFunction(filteredText)
+                                await textToSpeechContainerRef.current.forceSpeakFunction(filteredText)
 
                                 // speaking call again listening function
 
-                                if (props.webRTCContainerRef.current.recogniserStreamObjectRef && webRTCContainerRef.current.recogniserStreamObjectRef.recogniser) {
+                                if (webRTCContainerRef.current.recogniserStreamObjectRef && webRTCContainerRef.current.recogniserStreamObjectRef.recogniser) {
                                     console.error("a recogniser for stt is already running")
                                     return
                                 }
@@ -1539,32 +715,29 @@ export function Home(props) {
                                 }
 
 
-
-
                             } catch (error) {
                                 return console.error(error)
                             }
 
 
                             //sending to again ai
-                            if (!props.socketContainer.current || props.socketContainer.current.readyState !== 1) {
+                            if (!socketStore.getState().isActive()) {
                                 console.error("socket is not ready")
-                                props.userRef.current.yourGlobalStarAiReference.isAiCallingOn.flag = false;
+                                userStore.getState().yourGlobalStarAiReference.isAiCallingOn.flag = false;
                                 // buttonEl.style.backgroundColor = "transparent"
                                 return
                             }
 
 
 
-                            props.socketContainer.current.send(JSON.stringify({
+                            socketStore.getState().socket.send(JSON.stringify({
                                 type: "message",
                                 status: "calling",
-                                starAiRecentVoiceContextStack: (props.chatRef.current?.starAiRecentVoiceContextStack),
-                                message: props.userRef.current.yourGlobalStarAiReference.transcriptinput,
+                                starAiRecentVoiceContextStack: (chatStore.getState().starAiRecentVoiceContextStack),
+                                message: userStore.getState().yourGlobalStarAiReference.transcriptinput,
 
-                                receiver: props.userRef.current.yourGlobalStarAiReference,
-                                // sender: { username: props.userRef.current.username, id: props.userRef.current.id, age: props.userRef.current.age, gender: props.userRef.current.gender, country: props.userRef.current.country }
-                                sender: { username: props.userRef.current.username, id: props.userRef.current.id, country: props.userRef.current.country }
+                                receiver: userStore.getState().yourGlobalStarAiReference,
+                                sender: { username: userStore.getState().username, id: userStore.getState().id, country: userStore.getState().country }
 
 
                             }))
@@ -1585,80 +758,9 @@ export function Home(props) {
                         }
 
 
+                        // adds sender in contacts if absent, marks unread, and bumps unreadCount only if it was not already unread. O(1)
+                        userStore.getState().markUnread(data.sender)
 
-                        // checks if receiver already in my contacts or not
-
-                        let searchFound = false
-
-                        for (let i = 0; i < userRef.current.availableConnectedUsers.length; i++) {
-
-                            if (userRef.current.availableConnectedUsers[i].id === data.sender.id) {
-                                // this condition shows random sender is in your recent contacts already
-                                userRef.current.availableConnectedUsers[i].unread = true
-                                searchFound = true
-                                props.setRefreshUsersFlag((prev) => (prev + 1))
-
-                                userRef.current.availableConnectedUsersUnreadLength += 1
-
-                                props.setRecentUnreadContactCount(userRef.current.availableConnectedUsersUnreadLength)
-
-                                break
-                            }
-
-                        }
-
-                        if (!searchFound) {
-
-                            // this is means this user is not present in available contacts
-
-
-
-                            userRef.current.availableConnectedUsers.push(
-
-                                {
-
-                                    username: data.sender.username,
-                                    // age: data.sender.age,
-                                    // gender: data.sender.gender,
-                                    country: data.sender.country,
-                                    id: data.sender.id,
-                                    unread: true
-
-                                }
-                            )
-
-                            userRef.current.availableConnectedUsersUnreadLength += 1
-
-                            props.setRecentUnreadContactCount(userRef.current.availableConnectedUsersUnreadLength)
-
-
-                            props.setRefreshUsersFlag((prev) => (prev + 1))
-
-
-
-
-                        }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-                        // if (!inboxIconRef.current.classList.contains("svg-container-inbox-icon")) {
-
-
-                        //     inboxIconRef.current.classList.add("svg-container-inbox-icon")
-
-
-                        // }
                         return
                     }
 
@@ -1670,12 +772,12 @@ export function Home(props) {
 
 
                 if (data.type === "file-completed-response-from-server") { // this is saying file is received completely
-                    if (data.sender.id === userRef.current.id) {
+                    if (data.sender.id === userStore.getState().id) {
                         // you was the sender yourself
                         if (data.status === "failed") {// this is failed for file upload
                             console.error("meta data not found in server", data.msg)
 
-                            const chatsDiv = props.chatsDivRef.current
+                            const chatsDiv = chatsDivRef.current
 
 
                             const pendinGlobetFields = chatsDiv.querySelectorAll(".newly-unupdated-chats")
@@ -1696,9 +798,9 @@ export function Home(props) {
 
                         // alert("File upload fully completed!")
                         console.log("File uploaded successfully")
-                        props.chatRef.current.filesToBeSent[data.fileMetaDataInfo.upcomingFilename] = null;
+                        chatStore.getState().filesToBeSent[data.fileMetaDataInfo.upcomingFilename] = null;
 
-                        const chatsDiv = props.chatsDivRef.current
+                        const chatsDiv = chatsDivRef.current
 
 
                         const pendinGlobetFields = chatsDiv.querySelectorAll(".newly-unupdated-chats")
@@ -1725,9 +827,9 @@ export function Home(props) {
 
 
                                         "X-Modified-Filename": data.fileMetaDataInfo.upcomingFilename,
-                                        "X-Custom-Access-Token": props.userRef.current.customAccessToken,
-                                        "X-Sender-Id": props.userRef.current.id,
-                                        "X-Receiver-Id": userRef.current.focusedContact.id,
+                                        "X-Custom-Access-Token": userStore.getState().customAccessToken,
+                                        "X-Sender-Id": userStore.getState().id,
+                                        "X-Receiver-Id": userStore.getState().focusedContact.id,
                                         "X-Created-At": createdAt
 
                                     }
@@ -1765,21 +867,6 @@ export function Home(props) {
                                     alert("Download failed: " + err.message);
                                 }
                                 return
-
-
-
-                                // if (props.socketContainer.current.isStillDownloading) {
-                                //     console.error("wait a file is already downloading")
-                                //     return
-                                // }
-                                // props.socketContainer.current.send(JSON.stringify(
-                                //     {
-                                //         type: "download-file-request-from-client",
-                                //         sender: data.sender,
-                                //         receiver: data.receiver,
-                                //         fileMetaDataInfo: data.fileMetaDataInfo
-                                //     }
-                                // ))
                             }
 
 
@@ -1797,11 +884,11 @@ export function Home(props) {
                         return
 
                     }
-                    if (data.sender.id === userRef.current.focusedContact?.id) {
+                    if (data.sender.id === userStore.getState().focusedContact.id) {
                         if (data.status === "failed") {// this is failed for file upload
                             console.error("the impossible case happening , as there is no protocol which tell you that unsuccessfull file is received", data.msg)
 
-                            const chatsDiv = props.chatsDivRef.current
+                            const chatsDiv = chatsDivRef.current
 
 
                             const pendinGlobetFields = chatsDiv.querySelectorAll(".newly-unupdated-chats")
@@ -1820,7 +907,7 @@ export function Home(props) {
                         // this is telling file successfully uploaded
                         console.log("you got a file link from a sender");
 
-                        const chatsDiv = props.chatsDivRef.current
+                        const chatsDiv = chatsDivRef.current
                         const date = new Date(Number(data.createdAt))
 
                         const createdAt = date.toLocaleTimeString("en-IN", {
@@ -1861,19 +948,7 @@ export function Home(props) {
                         sizeSpan.textContent = fileSizeText
                         chatTextField.append(nameSpan, breaklineTag, sizeSpan)
 
-                        // chatTextField.textContent = data.fileMetaDataInfo.upcomingFilename
-
                         chatTextField.classList.add("isLink")
-                        // chatTextField.onclick = () => {
-                        //     props.socketContainer.current.send(JSON.stringify(
-                        //         {
-                        //             type: "download-file-request-from-client",
-                        //             sender: data.sender,
-                        //             receiver: data.receiver,
-                        //             fileMetaDataInfo: data.fileMetaDataInfo
-                        //         }
-                        //     ))
-                        // }
 
                         chatTextField.onclick = async () => {
 
@@ -1883,9 +958,9 @@ export function Home(props) {
 
 
                                     "X-Modified-Filename": data.upcomingFilename,
-                                    "X-Custom-Access-Token": props.userRef.current.customAccessToken,
-                                    "X-Sender-Id": props.userRef.current.id,
-                                    "X-Receiver-Id": userRef.current.focusedContact.id,
+                                    "X-Custom-Access-Token": userStore.getState().customAccessToken,
+                                    "X-Sender-Id": userStore.getState().id,
+                                    "X-Receiver-Id": userStore.getState().focusedContact.id,
                                     "X-Created-At": createdAt
 
                                 }
@@ -1923,21 +998,6 @@ export function Home(props) {
                                 alert("Download failed: " + err.message);
                             }
                             return
-
-
-
-                            // if (props.socketContainer.current.isStillDownloading) {
-                            //     console.error("wait a file is already downloading")
-                            //     return
-                            // }
-                            // props.socketContainer.current.send(JSON.stringify(
-                            //     {
-                            //         type: "download-file-request-from-client",
-                            //         sender: data.sender,
-                            //         receiver: data.receiver,
-                            //         fileMetaDataInfo: data.fileMetaDataInfo
-                            //     }
-                            // ))
                         }
 
 
@@ -1960,7 +1020,7 @@ export function Home(props) {
 
                         return
                     }
-                    if (data.receiver && data.sender.id !== userRef.current.focusedContact?.id) {
+                    if (data.sender && data.sender.id !== userStore.getState().focusedContact.id) {
 
 
                         // THIS IS THE CONDITION WHERE RECEIVER IS NOT FOCUSED BUT MESSAGE CAME FROM HIM
@@ -1971,90 +1031,13 @@ export function Home(props) {
                             return
                         }
 
+                        // same O(1) helper as text messages
+                        userStore.getState().markUnread(data.sender)
 
-
-                        // checks if receiver already in my contacts or not
-
-                        let searchFound = false
-
-                        for (let i = 0; i < userRef.current.availableConnectedUsers.length; i++) {
-
-                            if (userRef.current.availableConnectedUsers[i].id === data.sender.id) {
-                                // this condition shows random sender is in your recent contacts already
-                                userRef.current.availableConnectedUsers[i].unread = true
-                                searchFound = true
-                                props.setRefreshUsersFlag((prev) => (prev + 1))
-
-                                userRef.current.availableConnectedUsersUnreadLength += 1
-
-                                props.setRecentUnreadContactCount(userRef.current.availableConnectedUsersUnreadLength)
-
-                                break
-                            }
-
-                        }
-
-                        if (!searchFound) {
-
-                            // this is means this user is not present in available contacts
-
-
-
-                            userRef.current.availableConnectedUsers.push(
-
-                                {
-
-                                    username: data.sender.username,
-                                    // age: data.sender.age,
-                                    // gender: data.sender.gender,
-                                    country: data.sender.country,
-                                    id: data.sender.id,
-                                    unread: true
-
-                                }
-                            )
-
-                            userRef.current.availableConnectedUsersUnreadLength += 1
-
-                            props.setRecentUnreadContactCount(userRef.current.availableConnectedUsersUnreadLength)
-
-
-                            props.setRefreshUsersFlag((prev) => (prev + 1))
-
-
-
-
-                        }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-                        // if (!inboxIconRef.current.classList.contains("svg-container-inbox-icon")) {
-
-
-                        //     inboxIconRef.current.classList.add("svg-container-inbox-icon")
-
-
-                        // }
                         return
                     }
 
-
-                    return;
-
-
-
-
+                    return
                 }
                 if (data.type === "download-file-response-from-server") {
                     if (data.status === "failed") {
@@ -2062,13 +1045,11 @@ export function Home(props) {
                         return
                     }
 
-
-
-                    props.socketContainer.current.isStillDownloading = true
-                    props.socketContainer.current.downloadChunks = [];
-                    props.socketContainer.current.downloadBytesReceived = 0;
-                    props.socketContainer.current.downloadTotalBytes = data.fileMetaDataInfo.fileSize;
-                    props.socketContainer.current.downloadFilename = data.fileMetaDataInfo.filename;
+                    socketStore.isStillDownloading = true
+                    socketStore.downloadChunks = [];
+                    socketStore.downloadBytesReceived = 0;
+                    socketStore.downloadTotalBytes = data.fileMetaDataInfo.fileSize;
+                    socketStore.downloadFilename = data.fileMetaDataInfo.filename;
                     console.log("filename ", data.fileMetaDataInfo.filename)
                     console.log("filesize ", data.fileMetaDataInfo.fileSize)
 
@@ -2077,51 +1058,15 @@ export function Home(props) {
                     return
                 }
 
-
-
+                // reached only for a string message with an unknown data.type
                 console.error("invalid data type in response")
                 return
-            }
-            else {
-                if (props.socketContainer.current.downloadChunks !== undefined) {
-                    const chunk = new Uint8Array(message.data);
-                    props.socketContainer.current.downloadChunks.push(chunk);
-                    props.socketContainer.current.downloadBytesReceived += chunk.byteLength;
 
-                    // Check if download is complete
-                    if (props.socketContainer.current.downloadBytesReceived >= props.socketContainer.current.downloadTotalBytes) {
-                        // Combine all chunks into a blob
-                        const blob = new Blob(props.socketContainer.current.downloadChunks);
-                        const downloadUrl = URL.createObjectURL(blob);
-                        const a = document.createElement("a");
-                        a.href = downloadUrl;
-                        a.download = props.socketContainer.current.downloadFilename;
-                        document.body.appendChild(a);
-                        a.click();
-                        document.body.removeChild(a);
-
-                        // Clean up after a delay to ensure download starts
-                        setTimeout(() => {
-                            URL.revokeObjectURL(downloadUrl);
-                        }, 100);
-
-                        // Clean up
-                        props.socketContainer.current.isStillDownloading = false
-                        props.socketContainer.current.downloadChunks = undefined;
-                        props.socketContainer.current.downloadBytesReceived = 0;
-                        props.socketContainer.current.downloadTotalBytes = 0;
-                        props.socketContainer.current.downloadFilename = null;
-                        console.log("Download completed successfully");
-                    }
-                }
-                return
             }
 
         }
+
     }
-
-
-
 
 
 
@@ -2134,11 +1079,6 @@ export function Home(props) {
     const controlUserCallback = async (e) => {
 
 
-
-
-
-
-
         if (e.currentTarget.getAttribute("value") === "close") {
             setToggleSelect(false)
             return
@@ -2147,20 +1087,19 @@ export function Home(props) {
             setToggleSelect(false)
 
 
-            if (!props.socketContainer.current || props.socketContainer.current.readyState !== 1) {
+            if (!socketStore.getState().isActive()) {
 
                 console.error("socket is not ready")
-
 
                 return
             }
 
-            props.socketContainer.current.send(
+            socketStore.getState().socket.send(
                 JSON.stringify(
                     {
                         type: "query-message",
                         queryType: "refresh-all-user",
-                        sender: { username: props.userRef.current.username, id: props.userRef.current.id }
+                        sender: { username: userStore.getState().username, id: userStore.getState().id }
                     }
                 )
             )
@@ -2173,40 +1112,24 @@ export function Home(props) {
             setToggleSelect(false)
 
 
-            if (!props.socketContainer || props.socketContainer.current.readyState !== 1) {
+            if (!socketStore.getState().isActive()) {
                 window.location.href = '/';
                 return
             }
-            props.socketContainer.current.close()
+            const ws = socketStore.getState().socket
+            ws.onmessage = null;
+            ws.onerror = null;
+            ws.onclose = null;
+            ws.onopen = null;
+            ws.close()
+            socketStore.setState({ socket: null })
 
-            props.socketContainer.current.onmessage = null;
-            props.socketContainer.current.onerror = null;
-            props.socketContainer.current.onclose = null;
-            props.socketContainer.current.onopen = null;
-            props.socketContainer.current = null;
+            userStore.getState().reset()
+            chatStore.getState().clearChat()
 
-            props.userRef.current = null;
-            props.chatRef.current = null;
-            props.setUser("")
+            setHeaderTitle("Globet")
 
-            // window.location.href = '/';
             navigate("/")
-
-
-
-            // here exit full screen 
-
-            // if (document.exitFullscreen) {
-            //     document.exitFullscreen();
-            // } else if (document.webkitExitFullscreen) { // Safari
-            //     document.webkitExitFullscreen();
-            // } else if (document.msExitFullscreen) { // IE11
-            //     document.msExitFullscreen();
-            // }
-            //
-
-
-
 
             return
         }
@@ -2225,49 +1148,47 @@ export function Home(props) {
 
 
 
-            if (props.userRef.current.yourGlobalStarAiReference.isAiCallingOn.flag) { // checking whether ai already listening and if the stoping it
-                props.userRef.current.yourGlobalStarAiReference.isAiCallingOn.instance?.stop()
-                props.userRef.current.yourGlobalStarAiReference.isAiCallingOn.flag = false;
+            if (userStore.getState().yourGlobalStarAiReference.isAiCallingOn.flag) { // checking whether ai already listening and if the stoping it
+                userStore.getState().yourGlobalStarAiReference.isAiCallingOn.instance?.stop()
+                userStore.getState().yourGlobalStarAiReference.isAiCallingOn.flag = false;
                 buttonEl.style.backgroundColor = "transparent"
                 return
             }
 
             try {
 
-                props.userRef.current.yourGlobalStarAiReference.isAiCallingOn.flag = true;
+                userStore.getState().yourGlobalStarAiReference.isAiCallingOn.flag = true;
                 buttonEl.style.backgroundColor = "red"
                 const ok = await startChromeOfflineVoiceRecognition(props.userRef)
                 if (!ok) {
                     // buttonEl.style.backgroundColor = "transparent"
                     return console.error("no text detected.")
                 }
-                //props.userRef.current.yourGlobalStarAiReference.isAiCallingOn.instance = await startChromeOfflineVoiceRecognition(props.userRef)
 
 
             } catch (error) {
                 console.error("transripter is not working right now", error)
-                props.userRef.current.yourGlobalStarAiReference.isAiCallingOn.flag = false;
+                userStore.getState().yourGlobalStarAiReference.isAiCallingOn.flag = false;
                 buttonEl.style.backgroundColor = "transparent"
                 return
             }
 
-            if (!props.socketContainer.current || props.socketContainer.current.readyState !== 1) {
+            if (!socketStore.getState().socket || socketStore.getState().socket.readyState !== 1) {
                 console.error("socket is not ready")
-                props.userRef.current.yourGlobalStarAiReference.isAiCallingOn.flag = false;
+                userStore.getState().yourGlobalStarAiReference.isAiCallingOn.flag = false;
                 buttonEl.style.backgroundColor = "transparent"
                 return
             }
 
 
 
-            props.socketContainer.current.send(JSON.stringify({
+            socketStore.getState().socket.send(JSON.stringify({
                 type: "message",
                 status: "calling",
-                message: props.userRef.current.yourGlobalStarAiReference.transcriptinput,
+                message: userStore.getState().yourGlobalStarAiReference.transcriptinput,
 
-                receiver: props.userRef.current.yourGlobalStarAiReference,
-                // sender: { username: props.userRef.current.username, id: props.userRef.current.id, age: props.userRef.current.age, gender: props.userRef.current.gender, country: props.userRef.current.country }
-                sender: { username: props.userRef.current.username, id: props.userRef.current.id, country: props.userRef.current.country }
+                receiver: userStore.getState().yourGlobalStarAiReference,
+                sender: { username: userStore.getState().username, id: userStore.getState().id, country: userStore.getState().country }
 
 
             }))
@@ -2283,22 +1204,9 @@ export function Home(props) {
     }
 
 
-    // let lastScrollY = window.scrollY;
-
-    // window.addEventListener("scroll", () => {
-    //   const currentScrollY = window.scrollY;
-
-    //   if (currentScrollY < lastScrollY) {
-    //     console.log("scrolled up");
-    //   }
-
-    //   lastScrollY = currentScrollY;
-    // });
-
-
     return (
 
-        props.user ? (
+        id ? (
             <div className="home dashboard" >
 
                 <header className=" header"
@@ -2306,32 +1214,13 @@ export function Home(props) {
                 >
                     {/* above is the black header */}
                     <div
-                        style={{ visibility: (selectedReceiver.username || headerTitle !== "Globet") ? "visible" : "hidden", backgroundColor: "transparent" }}
+                        style={{ visibility: (focusedContact.username || headerTitle !== "Globet") ? "visible" : "hidden", backgroundColor: "transparent" }}
                         onClick={
                             () => {
 
-                                setSelectedReceiver({ username: "", gender: "" });
+                                chatStore.getState().clearChat()
 
-                                if (props.chatRef.current.availableChats) { props.chatRef.current.availableChats = [] }
-
-                                if (props.chatRef.current.receiver) {
-                                    props.chatRef.current.receiver = {
-                                        username: "",
-                                        id: "",
-                                        // age: null,
-                                        // gender: "",
-                                        country: ""
-                                    }
-                                    props.userRef.current.focusedContact = {
-
-                                        username: "",
-                                        id: "",
-                                        // age: null,
-                                        // gender: "",
-                                        country: ""
-
-                                    }
-                                }
+                                userStore.getState().clearFocusedContact()
 
                                 navigate("/users")
 
@@ -2341,8 +1230,8 @@ export function Home(props) {
                         }
                         className="button">
                         {/* this is the back button */}
-                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-arrow-left" viewBox="0 0 16 16">
-                            <path fill-rule="evenodd" d="M15 8a.5.5 0 0 0-.5-.5H2.707l3.147-3.146a.5.5 0 1 0-.708-.708l-4 4a.5.5 0 0 0 0 .708l4 4a.5.5 0 0 0 .708-.708L2.707 8.5H14.5A.5.5 0 0 0 15 8" />
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" className="bi bi-arrow-left" viewBox="0 0 16 16">
+                            <path fillRule="evenodd" d="M15 8a.5.5 0 0 0-.5-.5H2.707l3.147-3.146a.5.5 0 1 0-.708-.708l-4 4a.5.5 0 0 0 0 .708l4 4a.5.5 0 0 0 .708-.708L2.707 8.5H14.5A.5.5 0 0 0 15 8" />
                         </svg>
                     </div>
 
@@ -2353,43 +1242,33 @@ export function Home(props) {
                             fontFamily: "cursive",
                             color: "var(--professional-blue)",
                             fontWeight: "bold",
-                            // fontSize: "18px",
-                            // textDecoration: "underline",
                             textShadow: "1px 1px 1px var(--dark-black)"
                         }}
 
                     >
                         <div className="profile-photo-in-header" style={{
-                            display: selectedReceiver.username ? "flex" : "none",
-                            // backgroundImage: `url(${selectedReceiver.gender === "male" ? "male_small.png" : "female_small.png"})`
-                            // backgroundImage: 'url("default_user_photo.png")'
-                            backgroundImage: (selectedReceiver.country === "nocountry") ? (`url(${aiProfile.profileImage})`) : 'url("default_user_photo.png")'
+                            display: focusedContact.username ? "flex" : "none",
+                            backgroundImage: (focusedContact.country === "nocountry") ? (`url(${aiProfile.profileImage})`) : 'url("default_user_photo.png")'
 
                         }}>
 
                         </div>
-                        <i className={selectedReceiver.username ? "selected-username-holder" : ""}>{selectedReceiver.username || headerTitle}</i></div>
+                        <i className={focusedContact.username ? "selected-username-holder" : ""}>{focusedContact.username || headerTitle}</i></div>
 
 
                     {/* below div is the div to recent contacts */}
                     <div
-                        className={props.recentUnreadContactCount ? "svg-container-inbox-icon hovereffectbtn" : "inbox hovereffectbtn"}
-                        data-recent-contact-unread-count={props.recentUnreadContactCount}
+                        className={unreadCount ? "svg-container-inbox-icon hovereffectbtn" : "inbox hovereffectbtn"}
+                        data-recent-contact-unread-count={unreadCount}
                         ref={inboxIconRef}
 
                         onClick={
                             (e) => {
 
-                                // setSelectedReceiver({ username: "", gender: "", age: null, id: "" });
-                                setSelectedReceiver({ username: "", id: "" });
-
-                                // if (props.chatRef.current && props.chatRef.current.availableChats) {
-                                props.userRef.current.focusedContact = {}
-                                props.chatRef.current.availableChats = []
-                                // }
+                                userStore.getState().clearFocusedContact()
+                                chatStore.getState().clearChat()
 
                                 navigate("/mycontacts-and-notifications")
-                                props.setRefreshGlobalUsersFlag((prev) => (prev + 1))
                                 setHeaderTitle("Recent Connections")
 
 
@@ -2399,9 +1278,9 @@ export function Home(props) {
                     >
                         {/* this is div to recent contact */}
 
-                        <svg viewBox="0 0 24 24" height="24" width="24" preserveAspectRatio="xMidYMid meet" class="" fill="none">
+                        <svg viewBox="0 0 24 24" height="24" width="24" preserveAspectRatio="xMidYMid meet" className="" fill="none">
 
-                            <path fill-rule="evenodd" clip-rule="evenodd" d="M22.0002 6.66667C22.0002 5.19391 20.8062 4 19.3335 4H1.79015C1.01286 4 0.540213 4.86348 0.940127 5.53L3.00016 9V17.3333C3.00016 18.8061 4.19406 20 5.66682 20H19.3335C20.8062 20 22.0002 18.8061 22.0002 17.3333V6.66667ZM7.00016 10C7.00016 9.44772 7.44787 9 8.00016 9H17.0002C17.5524 9 18.0002 9.44772 18.0002 10C18.0002 10.5523 17.5524 11 17.0002 11H8.00016C7.44787 11 7.00016 10.5523 7.00016 10ZM8.00016 13C7.44787 13 7.00016 13.4477 7.00016 14C7.00016 14.5523 7.44787 15 8.00016 15H14.0002C14.5524 15 15.0002 14.5523 15.0002 14C15.0002 13.4477 14.5524 13 14.0002 13H8.00016Z" fill="currentColor"></path>
+                            <path fillRule="evenodd" clipRule="evenodd" d="M22.0002 6.66667C22.0002 5.19391 20.8062 4 19.3335 4H1.79015C1.01286 4 0.540213 4.86348 0.940127 5.53L3.00016 9V17.3333C3.00016 18.8061 4.19406 20 5.66682 20H19.3335C20.8062 20 22.0002 18.8061 22.0002 17.3333V6.66667ZM7.00016 10C7.00016 9.44772 7.44787 9 8.00016 9H17.0002C17.5524 9 18.0002 9.44772 18.0002 10C18.0002 10.5523 17.5524 11 17.0002 11H8.00016C7.44787 11 7.00016 10.5523 7.00016 10ZM8.00016 13C7.44787 13 7.00016 13.4477 7.00016 14C7.00016 14.5523 7.44787 15 8.00016 15H14.0002C14.5524 15 15.0002 14.5523 15.0002 14C15.0002 13.4477 14.5524 13 14.0002 13H8.00016Z" fill="currentColor"></path>
                         </svg>
 
                     </div>
@@ -2424,11 +1303,11 @@ export function Home(props) {
                         }
                         id="controls"
                         className="button hovereffectbtn"
-                        style={{ display: selectedReceiver.username ? "none" : "flex" }}
+                        style={{ display: focusedContact.username ? "none" : "flex" }}
 
                     >
                         <div>
-                            <svg viewBox="0 0 24 24" height="24" width="24" preserveAspectRatio="xMidYMid meet" class="" fill="none">
+                            <svg viewBox="0 0 24 24" height="24" width="24" preserveAspectRatio="xMidYMid meet" className="" fill="none">
 
                                 <path d="M12 20C11.45 20 10.9792 19.8042 10.5875 19.4125C10.1958 19.0208 10 18.55 10 18C10 17.45 10.1958 16.9792 10.5875 16.5875C10.9792 16.1958 11.45 16 12 16C12.55 16 13.0208 16.1958 13.4125 16.5875C13.8042 16.9792 14 17.45 14 18C14 18.55 13.8042 19.0208 13.4125 19.4125C13.0208 19.8042 12.55 20 12 20ZM12 14C11.45 14 10.9792 13.8042 10.5875 13.4125C10.1958 13.0208 10 12.55 10 12C10 11.45 10.1958 10.9792 10.5875 10.5875C10.9792 10.1958 11.45 10 12 10C12.55 10 13.0208 10.1958 13.4125 10.5875C13.8042 10.9792 14 11.45 14 12C14 12.55 13.8042 13.0208 13.4125 13.4125C13.0208 13.8042 12.55 14 12 14ZM12 8C11.45 8 10.9792 7.80417 10.5875 7.4125C10.1958 7.02083 10 6.55 10 6C10 5.45 10.1958 4.97917 10.5875 4.5875C10.9792 4.19583 11.45 4 12 4C12.55 4 13.0208 4.19583 13.4125 4.5875C13.8042 4.97917 14 5.45 14 6C14 6.55 13.8042 7.02083 13.4125 7.4125C13.0208 7.80417 12.55 8 12 8Z" fill="currentColor"></path>
                             </svg>
@@ -2443,14 +1322,14 @@ export function Home(props) {
                             <button onClick={
                                 (e) => { e.stopPropagation(); controlUserCallback(e) }
                             } className="option hovereffectbtn" value="close">
-                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-x-lg" viewBox="0 0 16 16">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" className="bi bi-x-lg" viewBox="0 0 16 16">
                                     <path d="M2.146 2.854a.5.5 0 1 1 .708-.708L8 7.293l5.146-5.147a.5.5 0 0 1 .708.708L8.707 8l5.147 5.146a.5.5 0 0 1-.708.708L8 8.707l-5.146 5.147a.5.5 0 0 1-.708-.708L7.293 8z" />
                                 </svg>
                             </button>
                             <button onClick={
                                 (e) => { e.stopPropagation(); controlUserCallback(e) }
                             } className="option hovereffectbtn" value="callai">
-                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-openai" viewBox="0 0 16 16">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" className="bi bi-openai" viewBox="0 0 16 16">
                                     <path d="M14.949 6.547a3.94 3.94 0 0 0-.348-3.273 4.11 4.11 0 0 0-4.4-1.934A4.1 4.1 0 0 0 8.423.2 4.15 4.15 0 0 0 6.305.086a4.1 4.1 0 0 0-1.891.948 4.04 4.04 0 0 0-1.158 1.753 4.1 4.1 0 0 0-1.563.679A4 4 0 0 0 .554 4.72a3.99 3.99 0 0 0 .502 4.731 3.94 3.94 0 0 0 .346 3.274 4.11 4.11 0 0 0 4.402 1.933c.382.425.852.764 1.377.995.526.231 1.095.35 1.67.346 1.78.002 3.358-1.132 3.901-2.804a4.1 4.1 0 0 0 1.563-.68 4 4 0 0 0 1.14-1.253 3.99 3.99 0 0 0-.506-4.716m-6.097 8.406a3.05 3.05 0 0 1-1.945-.694l.096-.054 3.23-1.838a.53.53 0 0 0 .265-.455v-4.49l1.366.778q.02.011.025.035v3.722c-.003 1.653-1.361 2.992-3.037 2.996m-6.53-2.75a2.95 2.95 0 0 1-.36-2.01l.095.057L5.29 12.09a.53.53 0 0 0 .527 0l3.949-2.246v1.555a.05.05 0 0 1-.022.041L6.473 13.3c-1.454.826-3.311.335-4.15-1.098m-.85-6.94A3.02 3.02 0 0 1 3.07 3.949v3.785a.51.51 0 0 0 .262.451l3.93 2.237-1.366.779a.05.05 0 0 1-.048 0L2.585 9.342a2.98 2.98 0 0 1-1.113-4.094zm11.216 2.571L8.747 5.576l1.362-.776a.05.05 0 0 1 .048 0l3.265 1.86a3 3 0 0 1 1.173 1.207 2.96 2.96 0 0 1-.27 3.2 3.05 3.05 0 0 1-1.36.997V8.279a.52.52 0 0 0-.276-.445m1.36-2.015-.097-.057-3.226-1.855a.53.53 0 0 0-.53 0L6.249 6.153V4.598a.04.04 0 0 1 .019-.04L9.533 2.7a3.07 3.07 0 0 1 3.257.139c.474.325.843.778 1.066 1.303.223.526.289 1.103.191 1.664zM5.503 8.575 4.139 7.8a.05.05 0 0 1-.026-.037V4.049c0-.57.166-1.127.476-1.607s.752-.864 1.275-1.105a3.08 3.08 0 0 1 3.234.41l-.096.054-3.23 1.838a.53.53 0 0 0-.265.455zm.742-1.577 1.758-1 1.762 1v2l-1.755 1-1.762-1z" />
                                 </svg>
                             </button>
@@ -2465,21 +1344,21 @@ export function Home(props) {
                                     textDecoration: "underline",
 
                                 }}
-                            ><i className="selected-username-holder-noborder">{props.userRef.current.username}</i></button>
+                            ><i className="selected-username-holder-noborder">{username}</i></button>
                             <button onClick={
                                 (e) => { e.stopPropagation(); controlUserCallback(e) }
                             } className="option hovereffectbtn" value="refresh" style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: '10px' }}>
-                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-arrow-repeat" viewBox="0 0 16 16">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" className="bi bi-arrow-repeat" viewBox="0 0 16 16">
                                     <path d="M11.534 7h3.932a.25.25 0 0 1 .192.41l-1.966 2.36a.25.25 0 0 1-.384 0l-1.966-2.36a.25.25 0 0 1 .192-.41m-11 2h3.932a.25.25 0 0 0 .192-.41L2.692 6.23a.25.25 0 0 0-.384 0L.342 8.59A.25.25 0 0 0 .534 9" />
-                                    <path fill-rule="evenodd" d="M8 3c-1.552 0-2.94.707-3.857 1.818a.5.5 0 1 1-.771-.636A6.002 6.002 0 0 1 13.917 7H12.9A5 5 0 0 0 8 3M3.1 9a5.002 5.002 0 0 0 8.757 2.182.5.5 0 1 1 .771.636A6.002 6.002 0 0 1 2.083 9z" />
+                                    <path fillRule="evenodd" d="M8 3c-1.552 0-2.94.707-3.857 1.818a.5.5 0 1 1-.771-.636A6.002 6.002 0 0 1 13.917 7H12.9A5 5 0 0 0 8 3M3.1 9a5.002 5.002 0 0 0 8.757 2.182.5.5 0 1 1 .771.636A6.002 6.002 0 0 1 2.083 9z" />
                                 </svg>Sync
                             </button>
                             <button onClick={
                                 (e) => { e.stopPropagation(); controlUserCallback(e) }
                             } className="option hovereffectbtn" value="logout" style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: '10px', color: "red" }}>
-                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-box-arrow-left" viewBox="0 0 16 16">
-                                    <path fill-rule="evenodd" d="M6 12.5a.5.5 0 0 0 .5.5h8a.5.5 0 0 0 .5-.5v-9a.5.5 0 0 0-.5-.5h-8a.5.5 0 0 0-.5.5v2a.5.5 0 0 1-1 0v-2A1.5 1.5 0 0 1 6.5 2h8A1.5 1.5 0 0 1 16 3.5v9a1.5 1.5 0 0 1-1.5 1.5h-8A1.5 1.5 0 0 1 5 12.5v-2a.5.5 0 0 1 1 0z" />
-                                    <path fill-rule="evenodd" d="M.146 8.354a.5.5 0 0 1 0-.708l3-3a.5.5 0 1 1 .708.708L1.707 7.5H10.5a.5.5 0 0 1 0 1H1.707l2.147 2.146a.5.5 0 0 1-.708.708z" />
+                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" className="bi bi-box-arrow-left" viewBox="0 0 16 16">
+                                    <path fillRule="evenodd" d="M6 12.5a.5.5 0 0 0 .5.5h8a.5.5 0 0 0 .5-.5v-9a.5.5 0 0 0-.5-.5h-8a.5.5 0 0 0-.5.5v2a.5.5 0 0 1-1 0v-2A1.5 1.5 0 0 1 6.5 2h8A1.5 1.5 0 0 1 16 3.5v9a1.5 1.5 0 0 1-1.5 1.5h-8A1.5 1.5 0 0 1 5 12.5v-2a.5.5 0 0 1 1 0z" />
+                                    <path fillRule="evenodd" d="M.146 8.354a.5.5 0 0 1 0-.708l3-3a.5.5 0 1 1 .708.708L1.707 7.5H10.5a.5.5 0 0 1 0 1H1.707l2.147 2.146a.5.5 0 0 1-.708.708z" />
                                 </svg> Logout
                             </button>
                         </aside>
@@ -2492,12 +1371,12 @@ export function Home(props) {
                     {/* below is call button for rtc */}
 
                     <section
-                        className="button hovereffectbtn" ref={props.rtcbuttonRef}
-                        style={{ display: selectedReceiver.username ? "none" : "none" }}
-                        onClick={() => { props.webRTCContainerRef.current.webRTCStartFunction("mediastream") }}
+                        className="button hovereffectbtn" ref={rtcbuttonRef}
+                        style={{ display: "none" }}
+                        onClick={() => { webRTCStartFunction("mediastream") }}
                     >
-                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-telephone-plus-fill" viewBox="0 0 16 16">
-                            <path fill-rule="evenodd" d="M1.885.511a1.745 1.745 0 0 1 2.61.163L6.29 2.98c.329.423.445.974.315 1.494l-.547 2.19a.68.68 0 0 0 .178.643l2.457 2.457a.68.68 0 0 0 .644.178l2.189-.547a1.75 1.75 0 0 1 1.494.315l2.306 1.794c.829.645.905 1.87.163 2.611l-1.034 1.034c-.74.74-1.846 1.065-2.877.702a18.6 18.6 0 0 1-7.01-4.42 18.6 18.6 0 0 1-4.42-7.009c-.362-1.03-.037-2.137.703-2.877zM12.5 1a.5.5 0 0 1 .5.5V3h1.5a.5.5 0 0 1 0 1H13v1.5a.5.5 0 0 1-1 0V4h-1.5a.5.5 0 0 1 0-1H12V1.5a.5.5 0 0 1 .5-.5" />
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" className="bi bi-telephone-plus-fill" viewBox="0 0 16 16">
+                            <path fillRule="evenodd" d="M1.885.511a1.745 1.745 0 0 1 2.61.163L6.29 2.98c.329.423.445.974.315 1.494l-.547 2.19a.68.68 0 0 0 .178.643l2.457 2.457a.68.68 0 0 0 .644.178l2.189-.547a1.75 1.75 0 0 1 1.494.315l2.306 1.794c.829.645.905 1.87.163 2.611l-1.034 1.034c-.74.74-1.846 1.065-2.877.702a18.6 18.6 0 0 1-7.01-4.42 18.6 18.6 0 0 1-4.42-7.009c-.362-1.03-.037-2.137.703-2.877zM12.5 1a.5.5 0 0 1 .5.5V3h1.5a.5.5 0 0 1 0 1H13v1.5a.5.5 0 0 1-1 0V4h-1.5a.5.5 0 0 1 0-1H12V1.5a.5.5 0 0 1 .5-.5" />
                         </svg>
 
 
@@ -2541,12 +1420,7 @@ export function Home(props) {
                     <form id="register-form" autoComplete="off" action="" className="inputs" onSubmit={(e) => {
 
                         initializeConnection(
-                            e,
-                            props.socketContainer,
-                            props.user,
-                            props.setUser,
-                            props.userRef,
-                            props.chatRef
+                            e
                         )
 
                     }}>
@@ -2554,38 +1428,9 @@ export function Home(props) {
                         <fieldset>
 
                             <legend>Username</legend>
-                            {/* <input required type="text" name="username" value={"" + Math.floor(Math.random() * 101)} /> */}
-                             <input required type="text" name="username" />
+                            <input required type="text" name="username" />
 
                         </fieldset>
-
-                        {/* <fieldset>
-
-                            <input required spellCheck={false} type="number" name="age" />
-
-                            <legend>Age</legend>
-
-                        </fieldset> */}
-
-                        {/* <section>
-
-                            <fieldset onClick={(e) => (e.currentTarget.children[0].click())}>
-
-                                <input required type="radio" name="gender" value="female" />
-
-                                <legend>Female</legend>
-
-
-                            </fieldset>
-                            <fieldset onClick={(e) => (e.currentTarget.children[0].click())}>
-
-                                <input required type="radio" name="gender" value="male" />
-
-                                <legend>Male</legend>
-
-                            </fieldset>
-
-                        </section> */}
 
                         <section className="selectbar-container" >
                             <fieldset >
@@ -2652,4 +1497,5 @@ export function Home(props) {
 
 
     );
+
 }

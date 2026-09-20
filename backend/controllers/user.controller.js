@@ -14,7 +14,6 @@ import path from "path";
 
 export const requestChatToken = async (currentUserPrompt, fewHistory = null) => {
 
-   
 
     let contents = [
 
@@ -63,8 +62,6 @@ export const requestChatToken = async (currentUserPrompt, fewHistory = null) => 
     }
 
 
-
-
 }
 
 export const createNewOneChat = async (senderId, receiverId, content, createdAt = "", isLink = false, fileSize = 0) => {
@@ -105,8 +102,8 @@ export const getChatList = async (senderId, receiverId) => {
         ).sort({ createdAt: 1 })
 
 
-
         return messages
+
     } catch (error) {
         console.error(error)
         return null
@@ -219,8 +216,6 @@ class Client {
 
     constructor(
         username,
-        //  age,
-        //  gender,
         country,
         socket,
         fileMetaDataInfo = null
@@ -229,8 +224,6 @@ class Client {
         this.fileMetaDataInfo = fileMetaDataInfo;
 
         this.socket = socket;
-        // this.age = age,
-        // this.gender = gender,
         this.country = country;
         this.id = this.generateId();
         this.customAccessToken = this.simpleHash(this.id.toString())
@@ -327,6 +320,7 @@ export const filesGarbageCollectorInterval = setInterval(async () => {
 
 
 export const activeClients = new Map()
+export const activeUsernames = new Set()
 
 // first client will be stars ai
 const StarAI = new Client("StarAI", "nocountry", "socket-to-StarAI")
@@ -335,9 +329,6 @@ activeClients.set(StarAI.id, StarAI)
 console.log("StartAi is active")
 
 export const newConnectionHandler = async (dbname, httpServer, allowedOrigin) => {
-
-
-
 
 
     const server = new WebSocketServer(
@@ -373,54 +364,39 @@ export const newConnectionHandler = async (dbname, httpServer, allowedOrigin) =>
     server.on("connection", (socket, request) => {
         console.log("a user just connected")
 
-        // await new Promise((resolve) => {
-        //     setTimeout(() => { resolve() }, 20000)
-        // })
-
-
         const { query } = parse(request.url, true)
-        const username = query.username
 
-        // const gender = query.gender
+        const { username , country } = query
 
-        const country = query.country
-
-
-
-
-        // const age = parseInt(query.age)
-
-        // if (age < 18) {
-        //     socket.close(1008, "age is less then 18")
-        //     return
-        // }
         const reservedUsernames = ["StarAI", "StarAi", "starai", "star_ai", "star.ai"]
 
         if (reservedUsernames.some(name => name === username)) {
             socket.close(1008, "this is a reserved username")
             return
         }
-        // const user = activeClients.has(id)
 
-        // if (user) {
-        //     socket.close(1008, "a user already exists")
-        //     return
+        if(activeUsernames.has(username)){
+            socket.close(1008, "this is already taken username")
+           
+            return
+        }
+        
+
+        // Map {
+        // "shivam" → client1,
+        // "rahul"  → client2
         // }
-        // const availableUsers = [...activeClients.entries()].map(([username, client], _, __) => ({ username: client.username, age: client.age, gender: client.gender, country: client.country, id: client.id }))
-        const availableUsers = [...activeClients.entries()].map(([username, client], _, __) => {
 
+        const availableUsers = [...activeClients.entries()].map(([key, client], index, wholeArray) => {
 
             return { username: client.username, country: client.country, id: client.id, unread: false }
         })
-        // const client = new Client(username, age, gender, country, socket)
+      
         const client = new Client(username, country, socket)
         socket.id = client.id;
 
         activeClients.set(client.id, client); //     KEY VALUE , ID : AND CLIENT
-
-
-
-
+        activeUsernames.add(username)
 
 
 
@@ -428,12 +404,9 @@ export const newConnectionHandler = async (dbname, httpServer, allowedOrigin) =>
             {
                 username: client.username,
                 type: "register",
-                // age: client.age,
-                // gender: client.gender,
                 country: client.country,
                 id: client.id,
                 customAccessToken: client.customAccessToken,
-
                 availableUsers: availableUsers
 
             }
@@ -451,11 +424,8 @@ export const newConnectionHandler = async (dbname, httpServer, allowedOrigin) =>
                     return
                 }
 
-                const sender = data?.sender
-                const receiver = data?.receiver
-                const type = data?.type
-                const queryType = data?.queryType
 
+                const {sender, receiver, type, queryType} = data;
 
 
                 if (!type) {
@@ -469,7 +439,7 @@ export const newConnectionHandler = async (dbname, httpServer, allowedOrigin) =>
                     //                                                              
 
 
-                    const createdAt = data?.createdAt
+                    const { createdAt }  = data;
 
                     const userObject = activeClients.get(receiver.id)
 
@@ -525,11 +495,11 @@ export const newConnectionHandler = async (dbname, httpServer, allowedOrigin) =>
                                 ))
                             }
 
-                            // const currentSocket = userObject.socket
+                            // const destinationSocket = userObject.socket
 
-                            // if (!currentSocket || currentSocket.readyState !== 1) {
+                            // if (!destinationSocket || destinationSocket.readyState !== 1) {
                             //     console.log("receiverr: ", receiver)
-                            //     console.log("readystate ",currentSocket.readyState)
+                            //     console.log("readystate ",destinationSocket.readyState)
 
 
                             //     return socket.send(JSON.stringify(
@@ -714,9 +684,9 @@ export const newConnectionHandler = async (dbname, httpServer, allowedOrigin) =>
                         ))
                     }
 
-                    const currentSocket = userObject.socket
+                    const destinationSocket = userObject.socket
 
-                    if (!currentSocket || currentSocket.readyState !== 1) {
+                    if (!destinationSocket || destinationSocket.readyState !== 1) {
 
 
                         return socket.send(JSON.stringify(
@@ -734,7 +704,7 @@ export const newConnectionHandler = async (dbname, httpServer, allowedOrigin) =>
                     // current socket have something and ready
                     if (data.status === "typing") {
 
-                        return currentSocket.send(
+                        return destinationSocket.send(
                             JSON.stringify({
                                 status: "typing",
                                 sender: sender,
@@ -763,13 +733,9 @@ export const newConnectionHandler = async (dbname, httpServer, allowedOrigin) =>
                         )
                     }
 
-                    // here socket is ready 
 
 
-
-
-
-                    currentSocket.send(
+                    destinationSocket.send(
                         JSON.stringify({
                             status: "success",
                             sender: sender,
@@ -835,7 +801,7 @@ export const newConnectionHandler = async (dbname, httpServer, allowedOrigin) =>
 
 
                     else if (queryType === "refresh-all-user") {
-                        console.log("i have sent the refresh user query")
+            
                         socket.send(
                             JSON.stringify({
                                 status: "success",
@@ -848,6 +814,7 @@ export const newConnectionHandler = async (dbname, httpServer, allowedOrigin) =>
                             })
 
                         )
+                 
 
                         return
                     }
@@ -1126,12 +1093,12 @@ export const newConnectionHandler = async (dbname, httpServer, allowedOrigin) =>
                     if (!receiver) {
                         return // just doing nothing, but later improve this
                     }
-                    const currentSocket = receiver.socket
+                    const destinationSocket = receiver.socket
 
-                    if (!currentSocket || currentSocket.readyState !== 1) {
+                    if (!destinationSocket || destinationSocket.readyState !== 1) {
                         return // just doing nothing, but later improve this
                     }
-                    currentSocket.send(JSON.stringify(
+                    destinationSocket.send(JSON.stringify(
                         {
                             status: "success",
                             sender: fileMetaDataInfo.sender,
@@ -1145,8 +1112,6 @@ export const newConnectionHandler = async (dbname, httpServer, allowedOrigin) =>
                     return
                 }
                 return;
-
-
 
 
 
@@ -1164,6 +1129,7 @@ export const newConnectionHandler = async (dbname, httpServer, allowedOrigin) =>
             await deleteUserAllChats(client.id)
             await deleteAllAssociatedFiles(client.id, handlingFilesDir)
             activeClients.delete(client.id)
+            activeClients.delete(client.username)
             return
 
         });
@@ -1175,6 +1141,7 @@ export const newConnectionHandler = async (dbname, httpServer, allowedOrigin) =>
             await deleteUserAllChats(client.id)
             await deleteAllAssociatedFiles(client.id, handlingFilesDir)
             activeClients.delete(client.id)
+            activeClients.delete(client.username)
             return
         });
     });

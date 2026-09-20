@@ -1,24 +1,10 @@
 import { MyRecentContactSection } from "./myContactSection"
 
-
-
-function AllContactsAndNotifications(props) {
-    
-  
+function AllContactsAndNotifications() {
     return (
         <div>
-            <MyRecentContactSection
-
-                userRef={props.userRef}
-                setRecentUnreadContactCount={props.setRecentUnreadContactCount}
-                socketContainer={props.socketContainer}
-                refreshUsersFlag={props.refreshUsersFlag}
-                CountryMap={props.CountryMap}
-                
-            />
-
+            <MyRecentContactSection />
         </div>
-
     )
 }
 

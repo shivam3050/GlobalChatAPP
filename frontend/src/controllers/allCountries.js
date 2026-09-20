@@ -974,3 +974,7 @@ export const countries = [
         "alt": "Venezuela"
     }
 ]
+
+
+
+export const CountryMap = new Map(countries.map((c) => [c.countryName, c]))

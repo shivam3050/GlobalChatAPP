@@ -24,6 +24,7 @@ export const connectDB = async () => {
         console.log("MongoDb Connected Successfully : ", dbname)
         return dbname
     } catch (error) {
+        console.log(error)
         throw new Error(error)
     }
 }

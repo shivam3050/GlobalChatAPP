@@ -1,115 +1,88 @@
-import { useEffect, useState } from "react"
+import { aiProfile, CountryMap } from "../controllers/allCountries"
+import { userStore } from "../zustand/userStore"
+import { socketStore } from "../zustand/socket"
 
+export const MyRecentContactSection = () => {
 
+    // store holds this as a dictionary: { [id]: { id, username, country, unread } }
+    const availableConnectedUsersMap = userStore((state) => state.availableConnectedUsers)
+    const availableConnectedUsers = Object.values(availableConnectedUsersMap || {})
 
-export const MyRecentContactSection = (props) => {
-
- 
-
-
-
-
-
-    const [updateAvailableConnectedUsersInUI, setUpdateAvailableConnectedUsersUsersInUI] = useState([])
-
-    useEffect(() => {
-        if (props.userRef.current.availableConnectedUsers) {
-            setUpdateAvailableConnectedUsersUsersInUI(props.userRef.current.availableConnectedUsers)
-        }
-
-        return
-
-
-    }, [props.refreshUsersFlag])
-
-
-
-    if (!props.userRef || !props.userRef.current.availableConnectedUsers || props.userRef.current.availableConnectedUsers.length === 0) {
-        return (<div className="any-label"
-            style={{ display: "flex", justifyContent: "center", alignItems: "center" }}
-        >
-            No recent connections
-
-        </div>)
+    if (availableConnectedUsers.length === 0) {
+        return (
+            <div className="any-label" style={{ display: "flex", justifyContent: "center", alignItems: "center" }}>
+                No recent connections
+            </div>
+        )
     }
 
+    return (
+        <div className="users-container">
+            {
+                availableConnectedUsers.map((user) => {
 
+                    const countryData = CountryMap.get(user.country);
 
-    return <div className="users-container">
-        {
-            updateAvailableConnectedUsersInUI.map((user, index) => {
-              
-                return (
-                    <div
-                        onClick={
-                            () => {
+                    return (
+                        <div
+                            onClick={() => {
 
-
-                                if (props.userRef.current.availableConnectedUsers[index].unread) {
-
-                                    props.userRef.current.availableConnectedUsersUnreadLength -= 1
-
-                                    props.setRecentUnreadContactCount(props.userRef.current.availableConnectedUsersUnreadLength)
-
-
-                                }
-
-
-                                if (!props.socketContainer?.current || props.socketContainer.current.readyState !== 1) {
+                                if (!socketStore.getState().isActive()) {
                                     return console.error("socket is not ready")
                                 }
 
-                                props.userRef.current.availableConnectedUsers[index].unread = false
+                                // clears unread flag + decrements unreadCount inside the store itself
+                                userStore.getState().markRead(user.id)
 
-                                props.socketContainer.current.send(
-                                    JSON.stringify(
-                                        {
-                                            // sender: { username: props.userRef.current.username, id: props.userRef.current.id, country: props.userRef.current.country },
-                                            // receiver: { username: user.username, id: user.id, country: user.country, gender: user.gender },
-                                            sender: { username: props.userRef.current.username, id: props.userRef.current.id, country: props.userRef.current.country },
-                                            receiver: { username: user.username, id: user.id, country: user.country },
-                                            type: "query-message",
-                                            queryType: "chat-list-demand"
-                                        }
-                                    )
+                                socketStore.getState().socket.send(
+                                    JSON.stringify({
+                                        sender: {
+                                            username: userStore.getState().username,
+                                            id: userStore.getState().id,
+                                            country: userStore.getState().country
+                                        },
+                                        receiver: {
+                                            username: user.username,
+                                            id: user.id,
+                                            country: user.country
+                                        },
+                                        type: "query-message",
+                                        queryType: "chat-list-demand"
+                                    })
                                 )
-
-                            }
-                        }
-                        key={index}>
-                        <div style={{
-                            // backgroundImage: `url(${user.gender === "male" ? "male_small.png" : "female_small.png"})`
-                            backgroundImage: (user.country==="nocountry") ? (`url(${aiProfile.profileImage})`): 'url("default_user_photo.png")'
-                            
-
-                        }}>
-
-                        </div>
-                        <div>
-                            <div>
-                                {user.username}
+                            }}
+                            key={user.id}
+                        >
+                            <div style={{
+                                backgroundImage: (user.country === "nocountry")
+                                    ? `url(${aiProfile.profileImage})`
+                                    : 'url("default_user_photo.png")'
+                            }}>
                             </div>
                             <div>
-                                <section></section> <section>{(user.country==="nocountry")?"":user.country}</section>
+                                <div>
+                                    {user.username}
+                                </div>
+                                <div>
+                                    <section></section> <section>{(user.country === "nocountry") ? "" : user.country}</section>
+                                </div>
+                            </div>
+                            <div>
+                                <section style={{
+                                    backgroundImage: (user.country === "nocountry")
+                                        ? 'url("default_user_photo.png")'
+                                        : (countryData?.png ? `url(${countryData.png})` : 'url("default_user_photo.png")')
+                                }}></section>
+                            </div>
 
-
+                            <div className="unread-highlight-container">
+                                <div className={user.unread ? "unread-notification-highlight-icon" : ""}>
+                                </div>
                             </div>
                         </div>
-                        <div>
-                            <section style={{ backgroundImage: `url(${props.CountryMap.get(user.country)?.png})` }}></section>
-
-                        </div>
-
-
-                        <div className="unread-highlight-container">
-                            <div className={user.unread ? "unread-notification-highlight-icon" : ""}>
-
-                            </div>
-                        </div>
-                    </div>
-                )
-            })
-        }
-    </div>
-
+                    )
+                })
+            }
+        </div>
+    )
 }

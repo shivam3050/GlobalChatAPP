@@ -4,6 +4,14 @@ App_copy_stable.jsx
 
 App_copy.jsx
 home_copy.jsx
+.py
+.env
+node_modules
+
+
+*.py
+*.pem
+
 
 
 # Logs
