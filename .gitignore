@@ -12,6 +12,13 @@ node_modules
 *.py
 *.pem
 
+backend/*.py
+backend/*.pem
+backend/certgen.py
+backend/cert.pem
+backend/key.pem
+backend/.env
+
 
 
 # Logs
