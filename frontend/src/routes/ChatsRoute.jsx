@@ -141,7 +141,7 @@ function ChatsRoute(props) {
 
                                 "Content-Type": "application/octet-stream",
                                 "X-Filename": file.name,
-                                "X-Custom-Access-Token": props.userRef.current.customAccessToken,
+                                "X-Custom-Access-Token": props.userRef.current.customAccessToken, // i will remove this token later, it is useless
                                 "X-Sender-Id": props.userRef.current.id,
                                 "X-Receiver-Id": props.userRef.current.focusedContact.id,
                                 "X-Created-At": timestamp

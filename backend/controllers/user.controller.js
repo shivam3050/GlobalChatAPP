@@ -226,7 +226,7 @@ class Client {
         this.socket = socket;
         this.country = country;
         this.id = this.generateId();
-        this.customAccessToken = this.simpleHash(this.id.toString())
+        this.customAccessToken = this.simpleHash(this.id.toString()) // i willl remove this token later as it is currenty useless
 
         if (typeof socket === "string") {
 
@@ -253,9 +253,9 @@ class Client {
             return null;
         }
 
-        let hash = 0n; // Use BigInt to avoid overflow issues
-        for (let i = 0; i < text.length; i++) {
-            hash = (hash * 31n + BigInt(text.charCodeAt(i))) & 0xFFFFFFFFFFFFn; // Keep within 48 bits
+        let hash = 0n; // this is the smallest bigint
+        for (let i = 0; i < text.length; i++) { // "a".charCodeAt(0) = 97
+            hash = (hash * 31n + BigInt(text.charCodeAt(i))) & 0xFFFFFFFFFFFFn; // 0xFFFFFFFFFFFFn this is maximum bigint number
         }
 
         // Convert BigInt to hex string (lowercase)
@@ -364,7 +364,7 @@ export const newConnectionHandler = async (dbname, httpServer, allowedOrigin) =>
     server.on("connection", (socket, request) => {
         console.log("a user just connected")
 
-        const { query } = parse(request.url, true)
+        const { query } = parse(request.url, true) 
 
         const { username , country } = query
 
@@ -384,7 +384,7 @@ export const newConnectionHandler = async (dbname, httpServer, allowedOrigin) =>
 
         // Map {
         // "shivam" → client1,
-        // "rahul"  → client2
+        // "india"  → client2
         // }
 
         const availableUsers = [...activeClients.entries()].map(([key, client], index, wholeArray) => {
@@ -427,7 +427,7 @@ export const newConnectionHandler = async (dbname, httpServer, allowedOrigin) =>
 
                 const {sender, receiver, type, queryType} = data;
 
-                console.log(data)
+           
 
 
                 if (!type) {
@@ -821,65 +821,7 @@ export const newConnectionHandler = async (dbname, httpServer, allowedOrigin) =>
 
                         return
                     }
-                    else if (queryType === "offer") {
-                        const presentSender = activeClients.get(sender?.id)
-                        const presentReceiver = activeClients.get(receiver?.id)
-                        if (!presentReceiver || !presentSender) {
-                            console.error("sender or receiver are gone")
-                            return
-                        }
-
-                        presentReceiver.socket.send(JSON.stringify({
-                            type: "query-message",
-                            query: "offer",
-                            d: data.d,
-                            sender: presentSender,
-                            receiver: presentReceiver,
-                          
-                        }))
-
-
-                        return
-                    }
-                    else if (queryType === "answer") {
-                        const presentSender = activeClients.get(sender?.id)
-                        const presentReceiver = activeClients.get(receiver?.id)
-                        if (!presentReceiver || !presentSender) {
-                            console.error("sender or receiver are gone , restart process")
-                            return
-                        }
-
-                        presentReceiver.socket.send(JSON.stringify({
-                            type: "query-message",
-                            query: "answer",
-                            d: data.d,
-                            sender: presentSender,
-                            receiver: presentReceiver,
-                          
-                        }))
-
-
-                        return
-                    }
-                    else if (queryType === "ice") {
-                        const presentSender = activeClients.get(sender?.id);
-                        const presentReceiver = activeClients.get(receiver?.id);
-
-                        if (!presentReceiver || !presentSender) {
-                            console.error("sender or receiver are gone during ICE exchange");
-                            return;
-                        }
-
-                        // Forward ICE candidate to receiver
-                        presentReceiver.socket.send(JSON.stringify({
-                            type: "query-message",
-                            d: data.d,
-                            query: "ice",
-                            sender: presentSender,
-                            receiver: presentReceiver
-                        }));
-                        return
-                    }
+                    
                     else {
 
                         console.error("invalid query under the valid type")
@@ -891,116 +833,37 @@ export const newConnectionHandler = async (dbname, httpServer, allowedOrigin) =>
 
                     return
                 }
-                else if (type === "file-meta-data-to-server") {
-                    // sender 
-                    // receiver
-                    // type
-                    // message: { filesize: file.size, filename: file.name },
-                    const upcomingFileInfo = data.message;
+               
+                // else if(type === "file-completed-response-from-server"){
+                //     // check ready state before send msg
+                //     socket.send(JSON.stringify(
+                //         {
+                //             status: "success",
+                //             sender: sender,
+                //             receiver: receiver,
+                //             type: type,
+                //             createdAt: createdAt,
+                //             msg: "file received on server",
+                //             fileMetaDataInfo: fileMetaDataInfo
+                //         }
+                //     ))
 
-                    let upcomingFilename = upcomingFileInfo.filename;
-
-                    const upcomingFilesize = upcomingFileInfo.filesize;
-
-                    // this is used
-                    upcomingFilename = sender.id + "_" + receiver.id + "_" + data.createdAt + "_" + upcomingFilename; //modified uniquefilename
-
-
-
-
-
-                    // this is used
-                    const upcomingFilestream = fs.createWriteStream(path.join(handlingFilesDir, upcomingFilename));
-
-                    const client = activeClients.get(sender.id)
-
-                    if (client.fileMetaDataInfo && client.fileMetaDataInfo.upcomingFilestream) {
-                        console.error("wait a file is already uploading")
-                        return socket.send(JSON.stringify(
-                            {
-                                status: "failed",
-                                sender: sender,
-                                receiver: receiver,
-                                type: "file-meta-data-response-from-server",
-                                createdAt: data.createdAt,
-                                msg: "wait file writer is busy",
-                                upcomingFilename: upcomingFilename
-                            }
-                        ))
-
-                    }
-                    client.fileMetaDataInfo = {
-
-                        upcomingFilestream: upcomingFilestream,
-                        upcomingFilesize: upcomingFilesize,
-                        totalReceivedBytes: 0,
-                        sender: sender,
-                        receiver: receiver,
-                        createdAt: data.createdAt,
-                        upcomingFilename: upcomingFilename,
-                        fileSize: upcomingFilesize
-
-                    };
-
-                    return socket.send(JSON.stringify(
-                        {
-                            status: "success",
-                            sender: sender,
-                            receiver: receiver,
-                            type: "file-meta-data-response-from-server",
-                            createdAt: data.createdAt,
-                            msg: "yes now send the file",
-                            upcomingFilename: upcomingFilename,
-                            fileSize: upcomingFilesize
-                        }
-                    ))
-
-
-                }
-                else if (type === "download-file-request-from-client") {
-                    const fileMetaDataInfo = data.fileMetaDataInfo
-                    const readStreamObject = createReadStreamOfAFile(path.join(handlingFilesDir, fileMetaDataInfo.upcomingFilename))
-                    if (!readStreamObject) {
-                        socket.send(JSON.stringify(
-                            {
-                                status: "failed",
-                                // sender: socket,
-                                // receiver: receiver,
-                                type: "download-file-response-from-server",
-                                // createdAt: createdAt,
-                                msg: "requested file is not present"
-                            }
-                        ))
-                        return
-
-                    }
-
-
-                    socket.send(JSON.stringify(
-                        {
-                            status: "success",
-                            // sender: socket,
-                            // receiver: receiver,
-                            type: "download-file-response-from-server",
-                            // createdAt: createdAt,
-                            fileMetaDataInfo: { filename: fileMetaDataInfo.upcomingFilename, fileSize: readStreamObject.fileSize },
-                            msg: "get ready i am sending you file raw data"
-                        }
-                    ))
-
-                    readStreamObject.readStream.on("data", (data) => {
-                        socket.send(data) // binary/raw
-                    })
-                    readStreamObject.readStream.on("end", () => {
-                        socket.send(JSON.stringify({
-                            status: "done"
-                        })); // optional end marker
-                    });
-
-                    return
-
-
-                }
+                //     const userObject = activeClients.get(receiver.id)
+                //     const destinationSocket = userObject.socket;
+                //     // check ready state before send msg
+                //     destinationSocket.send(JSON.stringify(
+                //         {
+                //             status: "success",
+                //             sender: sender,
+                //             receiver: receiver,
+                //             type: type,
+                //             createdAt: createdAt,
+                //             msg: "file received on server",
+                //             fileMetaDataInfo: fileMetaDataInfo
+                //         }
+                //     ))
+                //     return;
+                // }
                 else {
                     return console.log("dont have any valid type")
                 }
@@ -1008,117 +871,7 @@ export const newConnectionHandler = async (dbname, httpServer, allowedOrigin) =>
 
 
             }
-            else {
-                // BINARY frame
-                const id = socket.id
-                const sender = activeClients.get(id)
-                if (!sender) {
-                    console.log("your trace has been removed")
-
-                    return socket.send(JSON.stringify(
-                        {
-                            status: "failed",
-                            // sender: socket,
-                            // receiver: receiver,
-                            type: "file-meta-data-response-from-server",
-                            // createdAt: createdAt,
-                            msg: "you are removed"
-                        }
-                    ))
-                }
-                const fileMetaDataInfo = sender.fileMetaDataInfo
-                if (!fileMetaDataInfo) {  // is meta data is not found then i am not sending RECEIVER and CREATEDAT in the error this will key error in frontend
-                    console.error("file meta data was not found.")
-                    return socket.send(JSON.stringify(
-                        {
-                            status: "failed",
-                            sender: { username: sender.username, id: sender.id, country: sender.country },        // { username: props.userRef.current.username, id: props.userRef.current.id, country: props.userRef.current.country }
-                            // receiver: receiver,
-                            type: "file-completed-response-from-server",
-                            // createdAt: createdAt,
-                            msg: "file meta data not found, sent meta data first"
-                        }
-                    ))
-
-                }
-                const upcomingFilesize = fileMetaDataInfo.upcomingFilesize;
-
-                const filestream = fileMetaDataInfo.upcomingFilestream;
-
-                filestream.write(message);
-
-
-
-                sender.fileMetaDataInfo.totalReceivedBytes += message.length;
-
-                if (sender.fileMetaDataInfo.totalReceivedBytes >= upcomingFilesize) {
-                    filestream.end();
-                    sender.fileMetaDataInfo.upcomingFilestream = null;
-
-                    // here i can attach a chat to db about this file
-                    console.log("showing size when adding on db ", fileMetaDataInfo.fileSize)
-                    const result = await createNewOneChat(sender.id, fileMetaDataInfo.receiver.id, fileMetaDataInfo.upcomingFilename, fileMetaDataInfo.createdAt, true, fileMetaDataInfo.fileSize)
-
-
-                    sender.fileMetaDataInfo = null;
-
-                    if (!result) {
-                        // delete file on server also
-                        deleteOneFile(path.join(handlingFilesDir, fileMetaDataInfo.upcomingFilename))
-                        // i will not confirm the deletion here
-                        return socket.send(
-                            JSON.stringify({
-                                status: "failed",
-                                sender: sender,
-                                receiver: fileMetaDataInfo.receiver,
-                                type: "message",
-                                createdAt: fileMetaDataInfo.createdAt,
-                                msg: "chat not created in db of the uploaded file"
-                            })
-                        )
-                    }
-
-                    console.log("File upload complete.");
-                    socket.send(JSON.stringify(
-                        {
-                            status: "success",
-                            sender: fileMetaDataInfo.sender,
-                            receiver: fileMetaDataInfo.receiver,
-                            type: "file-completed-response-from-server",
-                            createdAt: fileMetaDataInfo.createdAt,
-                            msg: "file received on server",
-                            fileMetaDataInfo: { upcomingFilename: fileMetaDataInfo.upcomingFilename, fileSize: fileMetaDataInfo.fileSize }
-                        }
-                    ))
-                    // now i can send this link to another person also
-                    const receiver = activeClients.get(fileMetaDataInfo.receiver.id)
-                    // but i am not checking that receiver exists or not and not notifying to the sender about unavailbility of receiver
-                    if (!receiver) {
-                        return // just doing nothing, but later improve this
-                    }
-                    const destinationSocket = receiver.socket
-
-                    if (!destinationSocket || destinationSocket.readyState !== 1) {
-                        return // just doing nothing, but later improve this
-                    }
-                    destinationSocket.send(JSON.stringify(
-                        {
-                            status: "success",
-                            sender: fileMetaDataInfo.sender,
-                            receiver: fileMetaDataInfo.receiver,
-                            type: "file-completed-response-from-server",
-                            createdAt: fileMetaDataInfo.createdAt,
-                            msg: "file received on server",
-                            fileMetaDataInfo: { upcomingFilename: fileMetaDataInfo.upcomingFilename, fileSize: fileMetaDataInfo.fileSize }
-                        }
-                    ))
-                    return
-                }
-                return;
-
-
-
-            }
+           
 
 
         });

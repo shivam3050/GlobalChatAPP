@@ -399,6 +399,23 @@ export function Home(props) {
                         return
                     }
                 }
+                if(data.type === "file-completed-response-from-server"){
+                    // ye dono ke liye common rhega
+                    // socket.send(JSON.stringify(
+                    //     {
+                    //         status: "success",
+                    //         sender: sender,
+                    //         receiver: receiver,
+                    //         type: type,
+                    //         createdAt: createdAt,
+                    //         msg: "file received on server",
+                    //         fileMetaDataInfo: fileMetaDataInfo
+                    //     }
+                    // ))  this is from server sucees stored file respose
+                    
+                    return;
+                }
+                
             }
         };
     }
@@ -457,6 +474,7 @@ export function Home(props) {
     return (
         props.user ? (
             <div className="home dashboard">
+                {/* header is always mounted in Home */}
                 <header className="header">
                     {/* Back button for global users page */}
                     <div
@@ -569,7 +587,7 @@ export function Home(props) {
                     </section>
                 </header>
 
-                <Outlet />
+                <Outlet /> 
                 {/* this is overlay shown when user is offline */}
                 <section className="dashboard-overlay"
                     style={{ display: toggleSelect ? "block" : "none" }}

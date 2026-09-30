@@ -35,7 +35,7 @@ connectDB().then((dbname) => {
                 return;
             }
             if (req.url.startsWith("/download-file") && req.method === "POST") {
-                // verify encrypted token came from header
+                
                 const modifiedFileName = req.headers["x-modified-filename"]
                 const customAccessToken = req.headers["x-custom-access-token"]
 
@@ -45,6 +45,10 @@ connectDB().then((dbname) => {
                     res.end("Missing tokens"); // so that browser can stop hang up
                     return;
                 }
+
+                // verify encrypted token came from header
+                // lets assume token has verified
+
                 const senderId = req.headers["x-sender-id"]
                 const receiverId = req.headers["x-receiver-id"]
                 const timestamp = req.headers["x-created-at"]
@@ -127,12 +131,15 @@ connectDB().then((dbname) => {
                 }
 
                 // lets assume token verified
+                // token is of no use , i will remove the data token too later on
 
-
+                // here i for same timestamp i will add a unique counter so to avoid same timestaps in case of upload in same milisecond
                 const modifiedFileName = sender.id + "_" + receiver.id + "_" + timestamp + "_" + filename;
+
 
                 const writeStream = fs.createWriteStream(path.join(handlingFilesDir, modifiedFileName))
                 req.pipe(writeStream);
+
                 writeStream.on("finish", async () => {
                     // here only i will successfully message via socket
 
@@ -154,7 +161,7 @@ connectDB().then((dbname) => {
                         return
                     }
 
-
+                    // do alert to both about this information that your file has been stored
                     receiver.socket.send(JSON.stringify(
                         {
                             status: "success",
