@@ -1,83 +1,98 @@
-import { aiProfile, CountryMap } from "../controllers/allCountries"
-import { userStore } from "../zustand/userStore"
-import { socketStore } from "../zustand/socket"
+import { useEffect, useState } from "react"
+import { aiProfile } from "../controllers/allCountries" 
 
-export const UserSection = () => {
 
-    const availableUsers = userStore((state) => state.availableUsers);
-    console.log(userStore.getState().availableUsers)
 
-    if (!Array.isArray(availableUsers) || availableUsers.length === 0) {
-        return (
-            <div className="any-label" style={{ display: "flex", justifyContent: "center", alignItems: "center" }}>
-                No users online
-            </div>
-        )
-    }
+export const UserSection = (props) => {
 
-    return (
-        <div className="users-container my-contact-field-container" data-online-users-count={availableUsers.length}>
-            {
-                availableUsers.map((user) => {
 
-                    const countryData = CountryMap.get(user.country);
 
-                    return (
-                        <div
-                            className="hovereffectbtn"
-                            key={user.id}
-                            onClick={() => {
 
-                                if (!socketStore.getState().isActive()) {
+
+    const [updateAvailableUsersInUI, setUpdateAvailableUsersInUI] = useState([])
+
+    useEffect(() => {
+        if (props.userRef.current.availableUsers) {
+            setUpdateAvailableUsersInUI(props.userRef.current.availableUsers)
+            
+        }
+
+        return
+
+    }, [props.refreshGlobalUsersFlag])
+    console.log("userSection is rendered")
+    console.log(props.userRef.current.availableUsers)
+
+
+
+    return <div className="users-container my-contact-field-container" data-online-users-count={updateAvailableUsersInUI.length}>
+        {
+          
+
+            updateAvailableUsersInUI.map((user, index) => {
+
+                return (
+                    <div className="hovereffectbtn"
+                        onClick={
+                             () => {
+
+                                //  I WILL FIX THIS LATER
+
+                                // if (props.userRef.current.availableUsers[index].unread) {
+
+                                //     props.userRef.current.availableConnectedUsersUnreadLength -= 1
+
+                                //     props.setRecentUnreadContactCount(props.userRef.current.availableConnectedUsersUnreadLength)
+
+
+                                // }
+
+
+                                if (!props.socketContainer?.current || props.socketContainer.current.readyState !== 1) {
                                     return console.error("socket is not ready")
                                 }
-
-                                socketStore.getState().socket.send(
-                                    JSON.stringify({
-                                        sender: {
-                                            username: userStore.getState().username,
-                                            id: userStore.getState().id,
-                                            country: userStore.getState().country
-                                        },
-                                        receiver: {
-                                            username: user.username,
-                                            id: user.id,
-                                            country: user.country
-                                        },
-                                        type: "query-message",
-                                        queryType: "chat-list-demand"
-                                    })
+                                props.socketContainer.current.send(
+                                    JSON.stringify(
+                                        {
+                                            // sender: { username: props.userRef.current.username, id: props.userRef.current.id, age: props.userRef.current.age, gender: props.userRef.current.gender, country: props.userRef.current.country },
+                                            // receiver: { username: user.username, id: user.id, age: user.age, gender: user.gender, country: user.country },
+                                            sender: { username: props.userRef.current.username, id: props.userRef.current.id,  country: props.userRef.current.country },
+                                            receiver: { username: user.username, id: user.id,  country: user.country },
+                                            type: "query-message",
+                                            queryType: "chat-list-demand"
+                                        }
+                                    )
                                 )
-                            }}
-                        >
-                            <div style={{
-                                backgroundImage: (user.country === "nocountry")
-                                    ? `url(${aiProfile.profileImage})`
-                                    : 'url("default_user_photo.png")'
-                            }}>
-                            </div>
 
-                            <div>
-                                <div>
-                                    {user.username}
-                                </div>
-                                <div>
-                                    <section></section>
-                                    <section>{(user.country === "nocountry") ? "" : user.country}</section>
-                                </div>
-                            </div>
+                            }
+                        }
+                        key={index}>
+                        <div style={{
+                            backgroundImage: (user.country==="nocountry") ? (`url(${aiProfile.profileImage})`): 'url("default_user_photo.png")'
 
+                        }}>
+
+                        </div>
+                        <div>
                             <div>
-                                <section style={{
-                                    backgroundImage: (user.country === "nocountry")
-                                        ? 'url("default_user_photo.png")'
-                                        : (countryData?.png ? `url(${countryData.png})` : 'url("default_user_photo.png")')
-                                }}></section>
+                                {user.username}
+                            </div>
+                            <div>
+                                <section>
+                                    {/* {`Age ${user.age} yrs`} */}
+                                    </section> <section>{(user.country==="nocountry")?"":user.country}</section>
+                                
+                                
                             </div>
                         </div>
-                    )
-                })
-            }
-        </div>
-    )
+                        <div>
+                            <section style={{backgroundImage:(user.country==="nocountry")?('url("default_user_photo.png")'):(`url(${props.CountryMap.get(user.country)?.png})`)}}></section>
+
+                        </div>
+                    </div>
+                )
+            })
+        }
+    </div>
+
 }

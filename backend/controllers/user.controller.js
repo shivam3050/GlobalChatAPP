@@ -427,6 +427,8 @@ export const newConnectionHandler = async (dbname, httpServer, allowedOrigin) =>
 
                 const {sender, receiver, type, queryType} = data;
 
+                console.log(data)
+
 
                 if (!type) {
                     return console.error("type is not availbale")
@@ -801,6 +803,7 @@ export const newConnectionHandler = async (dbname, httpServer, allowedOrigin) =>
 
 
                     else if (queryType === "refresh-all-user") {
+                    
             
                         socket.send(
                             JSON.stringify({

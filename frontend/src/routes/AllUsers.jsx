@@ -1,10 +1,23 @@
 import { UserSection } from "./userSection"
 
-function AllUsers() {
+
+function AllUsers(props) {
+  
     return (
         <div>
-            <UserSection />
+            <UserSection
+                userRef={props.userRef}
+                
+                setRecentUnreadContactCount={props.setRecentUnreadContactCount}
+                socketContainer={props.socketContainer}
+                refreshGlobalUsersFlag={props.refreshGlobalUsersFlag}
+
+                CountryMap={props.CountryMap}
+
+            />
+
         </div>
+
     )
 }
 
