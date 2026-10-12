@@ -17,10 +17,7 @@ connectDB().then((dbname) => {
     const allowedOrigin = [process.env.WHITELISTED_FRONTEND_URL];
 
 
-    
-
     const server = http.createServer((req, res) => {
-
 
             const headers = {
                 'Content-Type': 'text/plain',
@@ -38,7 +35,6 @@ connectDB().then((dbname) => {
                 
                 const modifiedFileName = req.headers["x-modified-filename"]
                 const customAccessToken = req.headers["x-custom-access-token"]
-
 
                 if (!customAccessToken || !modifiedFileName) {
                     res.writeHead(404);

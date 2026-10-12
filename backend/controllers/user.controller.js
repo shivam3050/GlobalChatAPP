@@ -99,7 +99,7 @@ export const getChatList = async (senderId, receiverId) => {
                 ]
             },
             { senderId: 1, receiverId: 1, content: 1, createdAt: 1, isLink: 1, fileSize: 1, _id: 0 }
-        ).sort({ createdAt: 1 })
+        ).sort({ createdAt: -1 }).limit(50).lean()
 
 
         return messages
@@ -220,13 +220,15 @@ class Client {
         socket,
         fileMetaDataInfo = null
     ) {
-        this.username = username;
+        // new Client(): header 24 B + 10 slots x 8 B = 104 B, permanent
+        this.username = username; // worst: 100 chars = ~1 KB, permanent
         this.fileMetaDataInfo = fileMetaDataInfo;
 
-        this.socket = socket;
-        this.country = country;
-        this.id = this.generateId();
-        this.customAccessToken = this.simpleHash(this.id.toString()) // i willl remove this token later as it is currenty useless
+        this.socket = socket; // worst: slot upar count, par ws object: incoming 100 MB maxPayload
+        this.country = country; // worst: 100 chars = ~1 KB, permanent
+        this.id = this.generateId(); // worst: 18 chars = 40 B, permanent
+        this.customAccessToken = this.simpleHash(this.id.toString()) // worst: 32 B (hamesha exactly 16 chars), permanent
+        // i willl remove this token later as it is currenty useless
 
         if (typeof socket === "string") {
 
@@ -264,7 +266,7 @@ class Client {
         // Pad with leading zeros to make it exactly 16 characters
         return hex.padStart(16, '0').slice(-16);
     }
-}
+} // 20KB to 45KB for each object, this include heavy size by socket object
 
 
 let folderId = null;
@@ -319,8 +321,8 @@ export const filesGarbageCollectorInterval = setInterval(async () => {
 
 
 
-export const activeClients = new Map()
-export const activeUsernames = new Set()
+export const activeClients = new Map() // assuming 50KB for each user, assuming 1000 User will take 50MB
+export const activeUsernames = new Set() // assuming each user will take 2B , assuming 1000 users will take 2KB
 
 // first client will be stars ai
 const StarAI = new Client("StarAI", "nocountry", "socket-to-StarAI")
@@ -331,9 +333,10 @@ console.log("StartAi is active")
 export const newConnectionHandler = async (dbname, httpServer, allowedOrigin) => {
 
 
-    const server = new WebSocketServer(
+    const server = new WebSocketServer( 
         {
             server: httpServer,
+            // maxPayload: 64 * 1024,   // 5KB per user
             verifyClient: (info, done) => {
                 const origin = info.origin;
                 let allowed = false
@@ -387,10 +390,38 @@ export const newConnectionHandler = async (dbname, httpServer, allowedOrigin) =>
         // "india"  → client2
         // }
 
-        const availableUsers = [...activeClients.entries()].map(([key, client], index, wholeArray) => {
+        // const availableUsers = [...activeClients.entries()].map(([key, client], index, wholeArray) => {
 
-            return { username: client.username, country: client.country, id: client.id, unread: false }
-        })
+        //     return { username: client.username, country: client.country, id: client.id, unread: false }
+        // })
+
+        
+        function getRandom(map, p) {
+            let n, cnt, ans, k, v, idx;
+
+            n = map.size;
+            if (p > n - 1) p = n - 1;
+            idx = new Set();
+
+            while (idx.size < p) {
+                idx.add(Math.floor(Math.random() * (n - 1)) + 1);
+            }
+
+            cnt = 0;
+            ans = [];
+
+            for ([k, v] of map) {
+                if (idx.has(cnt)) {
+                    ans.push([k, v]);
+                }
+                cnt++;
+            }
+
+            return ans;
+        }
+        const availableUsers = [StarAI, ...getRandom(activeClients,49)].map(([, c]) => ({ username: c.username, country: c.country, id: c.id }))
+
+
       
         const client = new Client(username, country, socket)
         socket.id = client.id;
@@ -428,7 +459,6 @@ export const newConnectionHandler = async (dbname, httpServer, allowedOrigin) =>
                 const {sender, receiver, type, queryType} = data;
 
            
-
 
                 if (!type) {
                     return console.error("type is not availbale")
@@ -803,7 +833,18 @@ export const newConnectionHandler = async (dbname, httpServer, allowedOrigin) =>
 
 
                     else if (queryType === "refresh-all-user") {
-                    
+                        const nowTime = Date.now()
+                        if (nowTime - client.lastRefresh < 2000) {
+                            return socket.send(JSON.stringify({
+                                status: "failed",
+                                type: type,
+                                query: queryType,
+                                msg: "too fast, wait 2 seconds"
+                            }))
+                        }
+
+                        client.lastRefresh = nowTime
+
             
                         socket.send(
                             JSON.stringify({
@@ -811,8 +852,8 @@ export const newConnectionHandler = async (dbname, httpServer, allowedOrigin) =>
                                 sender: sender,
                                 type: type,
                                 query: queryType,
-                                // msg: [...activeClients.entries()].map(([username, client], _, __) => ({ username: client.username, age: client.age, gender: client.gender, country: client.country, id: client.id })).filter((item, _, __) => (item.id !== sender.id))
-                                msg: [...activeClients.entries()].map(([username, client], _, __) => ({ username: client.username, country: client.country, id: client.id })).filter((item, _, __) => (item.id !== sender.id))
+                                msg: [["StarAI", StarAI],...getRandom(activeClients,49)].map(([username, client], _, __) => ({ username: client.username, country: client.country, id: client.id })).filter((item, _, __) => (item.id !== sender.id))
+                                // msg: [...activeClients.entries()].map(([username, client], _, __) => ({ username: client.username, country: client.country, id: client.id })).filter((item, _, __) => (item.id !== sender.id))
                                 // msg: await searchAllUsers()
                             })
 

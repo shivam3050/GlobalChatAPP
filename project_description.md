@@ -1,38 +1,90 @@
-**Backend**
+# Backend
 
-http.createServer
-new WebSocketServer
+- `http.createServer`
+- `new WebSocketServer`
 
-**USING HTTP**
-req.method === "OPTIONS"                                      -> res.writeHead(204, headers)
-req.url.startsWith("/download-file") && req.method === "POST" -> fs.createReadStream(filepath)
-req.url.startsWith("/upload-file") && req.method === "POST"   -> fs.createWriteStream(filepath)
+## Using HTTP APIs
 
-**USING WS**
-server.on("connection") -> activeClients.set(client.id, client); 
-socket.on("message")    -> (parse message into json)
+### OPTIONS
 
-                           {sender, receiver, type, queryType}
-                            type -> {"message", "query-message", *"file-meta-data-to-server",}
-                            queryType -> {"chat-list-demand", "refresh-all-user"}
+`req.method === "OPTIONS"` -> `res.writeHead(204, headers)`
 
-**Frontend**
+### Download file
 
-new WebSocket("ws://localhost:8000")
+```
+req.url.startsWith("/download-file")
 
-App.JSX
+input =
+req.headers["x-modified-filename"]
+req.headers["x-sender-id"]
+req.headers["x-receiver-id"]
+req.headers["x-created-at"]
+req.headers["x-custom-access-token"]
 
-    ALL Global Instance References lies here
+output =
+fs.createReadStream(filepath).pipe(res)
+```
 
-    BrowserRouter
-        Routes
-            Route path="/" element={<Home/>} "### This route is always mounted and contains all websocket event listener definitions ###"
-                Route index element={<AllUsers/>}
-                Route path="users" element={<AllUsers/>}
-                Route path="chats" element={<ChatsRoute/>}
-                Route path="mycontacts-and-notifications" element={<AllContactsAndNotifications/>}
-                
-            Route path="*" element={<p>Not found the page</p>}
+### Upload file
 
-    
+```
+req.url.startsWith("/upload-file")
 
+input =
+req.headers["x-modified-filename"]
+req.headers["x-sender-id"]
+req.headers["x-receiver-id"]
+req.headers["x-created-at"]
+req.headers["x-custom-access-token"]
+
+output =
+req.pipe(fs.createWriteStream(filepath))
+```
+
+## Using WS APIs
+
+### Connection
+
+```
+server.on("connection") ->
+
+input = { username, country }
+
+output = {
+  username,
+  type,
+  country,
+  id,
+  customAccessToken,
+  availableUsers: availableUsers
+}
+```
+
+### Message
+
+```
+socket.on("message") ->
+
+input = { sender, receiver, type, queryType }
+type (may be) = { "message", "query-message", *"file-meta-data-to-server" }
+queryType (may be) = { "chat-list-demand", "refresh-all-user" }
+```
+
+# Frontend
+
+`new WebSocket("ws://localhost:8000")`
+
+## App.JSX
+
+All global instance references lie here.
+
+```
+BrowserRouter
+  Routes
+    Route path="/" element={<Home/>}   // always mounted, all websocket event listeners yahin hain
+      Route index element={<AllUsers/>}
+      Route path="users" element={<AllUsers/>}
+      Route path="chats" element={<ChatsRoute/>}
+      Route path="mycontacts-and-notifications" element={<AllContactsAndNotifications/>}
+    Route path="*" element={<p>Not found the page</p>}
+```
