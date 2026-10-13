@@ -1,7 +1,90 @@
 import { useLayoutEffect, useState } from "react";
 import { useEffect } from "react";
 
+export function shortFilename(longname) {
 
+    function nthIndex(str, char, n) {
+      let i = -1;
+      while (n-- && i++ < str.length) {
+        i = str.indexOf(char, i);
+        if (i === -1) break;
+      }
+      return i;
+    }
+    const idx = nthIndex(longname, "_", 3);
+    return longname.slice(idx + 1);
+
+  }
+
+  export function theseMessagesAreByAI(item, createdAt) {
+    let startCode = false;
+    let blockId = -1;
+    const lines = (item.content || "").split("\n");
+
+    return (
+      <div style={{ alignSelf: "flex-start", maxWidth: "90%" }}>
+        <div style={{ display: "flex", flexDirection: "column", rowGap: "0" }}>
+          {lines.map((originalLine, idx) => {
+            let line = originalLine;
+
+            if (line.length === 0) return null;
+
+            // Code block start
+            if (!startCode && line.startsWith("```")) {
+              startCode = true;
+              blockId += 1;
+              const thisBlock = blockId;
+
+              return (
+                <legend
+                  onClick={(e) => {
+                    let text = ""
+                    for (let code of e.currentTarget.parentElement.querySelectorAll(`.codeBlock-${thisBlock}`)) {
+                      text += code.textContent + "\n"
+
+                    }
+                    window.navigator.clipboard.writeText(text);
+
+                  }}
+                  key={idx}
+                  className="codeLine copylegend"
+                >
+                  {"Copy"}
+                </legend>
+              );
+            }
+
+            // Code block end
+            if (startCode && line.startsWith("```") && line.length === 3) {
+              startCode = false;
+              return null;
+            }
+
+            // Inside code block
+            if (startCode) {
+              let indexOfComment = line.indexOf("//");
+              if (indexOfComment !== -1) {
+                line = line.slice(0, indexOfComment);
+              }
+              return (
+                <div key={idx} className={`codeLine codeBlock-${blockId}`}>
+                  {line}
+                </div>
+              );
+            }
+
+            // Normal non-code line
+            return (
+              <div key={idx}>
+                {line}
+              </div>
+            );
+          })}
+        </div>
+        {/* <div style={{ marginTop: "var(--max-margin)" }}>{createdAt}</div> */}
+      </div>
+    );
+  }
 export const ChatSection = (props) => {
 
 
@@ -116,91 +199,10 @@ export const ChatSection = (props) => {
 
   //     //NEW CONCEPT END
   // }
-  function theseMessagesAreByAI(item, createdAt) {
-    let startCode = false;
-    let blockId = -1;
-    const lines = (item.content || "").split("\n");
-
-    return (
-      <div style={{ alignSelf: "flex-start", maxWidth: "90%" }}>
-        <div style={{ display: "flex", flexDirection: "column", rowGap: "0" }}>
-          {lines.map((originalLine, idx) => {
-            let line = originalLine;
-
-            if (line.length === 0) return null;
-
-            // Code block start
-            if (!startCode && line.startsWith("```")) {
-              startCode = true;
-              blockId += 1;
-              const thisBlock = blockId;
-
-              return (
-                <legend
-                  onClick={(e) => {
-                    let text = ""
-                    for (let code of e.currentTarget.parentElement.querySelectorAll(`.codeBlock-${thisBlock}`)) {
-                      text += code.textContent + "\n"
-
-                    }
-                    window.navigator.clipboard.writeText(text);
-
-                  }}
-                  key={idx}
-                  className="codeLine copylegend"
-                >
-                  {"Copy"}
-                </legend>
-              );
-            }
-
-            // Code block end
-            if (startCode && line.startsWith("```") && line.length === 3) {
-              startCode = false;
-              return null;
-            }
-
-            // Inside code block
-            if (startCode) {
-              let indexOfComment = line.indexOf("//");
-              if (indexOfComment !== -1) {
-                line = line.slice(0, indexOfComment);
-              }
-              return (
-                <div key={idx} className={`codeLine codeBlock-${blockId}`}>
-                  {line}
-                </div>
-              );
-            }
-
-            // Normal non-code line
-            return (
-              <div key={idx}>
-                {line}
-              </div>
-            );
-          })}
-        </div>
-        {/* <div style={{ marginTop: "var(--max-margin)" }}>{createdAt}</div> */}
-      </div>
-    );
-  }
 
 
-  function shortFilename(longname) {
 
-    function nthIndex(str, char, n) {
-      let i = -1;
-      while (n-- && i++ < str.length) {
-        i = str.indexOf(char, i);
-        if (i === -1) break;
-      }
-      return i;
-    }
-    const idx = nthIndex(longname, "_", 3);
-    return longname.slice(idx + 1);
 
-  }
 
 
 
@@ -267,8 +269,8 @@ export const ChatSection = (props) => {
 
                                         "X-Modified-Filename": item.content,
                                         "X-Custom-Access-Token": props.userRef.current.customAccessToken,
-                                        "X-Sender-Id": item.senderId,
-                                        "X-Receiver-Id": item.receiverId,
+                                        "X-Sender-Username": item.senderUsername,
+                                        "X-Receiver-Username": item.receiverUsername,
                                         "X-Created-At": createdAt
 
                                     }
@@ -318,7 +320,15 @@ export const ChatSection = (props) => {
                     {item.isLink ? (<><span> {shortFilename(item.content)}</span> <br></br>
                       <span> {
                         (item.fileSize < 1024) ? (Math.trunc(item.fileSize * 100) / 100 + " B") : ((item.fileSize < 1048576) ? (Math.trunc((item.fileSize / 1024) * 100) / 100 + " KB") : (Math.trunc((item.fileSize / 1048576) * 100) / 100 + " MB"))
-                      }</span></>) : (<>{item.content}<span className="hovereffectbtn playAnyMessageBtn" onClick={()=> props.textToSpeechContainerRef.current.forceSpeakFunction(item.content)}>▶</span></>)}
+                      }</span></>) : (<>{item.content}
+                      <span className="hovereffectbtn playAnyMessageBtn" onClick={()=> props.textToSpeechContainerRef.current.forceSpeakFunction(item.content)}>
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" fill="currentColor" />
+                          <path d="M15.5 8.5a5 5 0 0 1 0 7" />
+                          <path d="M19 5a10 10 0 0 1 0 14" />
+                          </svg>
+                      </span></>)}
 
 
 

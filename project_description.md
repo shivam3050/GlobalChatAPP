@@ -16,8 +16,8 @@ req.url.startsWith("/download-file")
 
 input =
 req.headers["x-modified-filename"]
-req.headers["x-sender-id"]
-req.headers["x-receiver-id"]
+req.headers["x-sender-username"]
+req.headers["x-receiver-username"]
 req.headers["x-created-at"]
 req.headers["x-custom-access-token"]
 
@@ -31,9 +31,8 @@ fs.createReadStream(filepath).pipe(res)
 req.url.startsWith("/upload-file")
 
 input =
-req.headers["x-modified-filename"]
-req.headers["x-sender-id"]
-req.headers["x-receiver-id"]
+req.headers["x-sender-username"]
+req.headers["x-receiver-username"]
 req.headers["x-created-at"]
 req.headers["x-custom-access-token"]
 
@@ -54,7 +53,6 @@ output = {
   username,
   type,
   country,
-  id,
   customAccessToken,
   availableUsers: availableUsers
 }
@@ -65,8 +63,8 @@ output = {
 ```
 socket.on("message") ->
 
-input = { sender, receiver, type, queryType }
-type (may be) = { "message", "query-message", *"file-meta-data-to-server" }
+input = { sender, receiver, type, queryType, customAccessToken }
+type (may be) = { "message", "query-message", "file-completed-response-from-server" }
 queryType (may be) = { "chat-list-demand", "refresh-all-user" }
 ```
 

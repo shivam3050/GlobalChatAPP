@@ -3,6 +3,7 @@ import { aiProfile, countries } from "../controllers/allCountries.js";
 import { useState, useRef } from "react";
 import Loading from "../utilitiesCompo/loading";
 import { Outlet, useNavigate } from "react-router-dom";
+import { shortFilename } from "./chat.jsx";
 
 
 export function Home(props) {
@@ -412,6 +413,146 @@ export function Home(props) {
                     //         fileMetaDataInfo: fileMetaDataInfo
                     //     }
                     // ))  this is from server sucees stored file respose
+                    if(data.sender.id === props.userRef.current.id){
+                        if (data.status === "failed") {
+                            console.error("your msg has been failed", data.msg)
+                            const chatsDiv = props.chatsDivRef.current
+                            const pendingFields = chatsDiv.querySelectorAll(".newly-unupdated-chats")
+                            for (let i = 0; i < pendingFields.length; i++) {
+                                pendingFields[i].children[1].textContent = `❌`
+                                pendingFields[i].classList.remove("newly-unupdated-chats")
+                            }
+                            return
+                        }
+
+                        if (data.status === "success") {
+                            // Remove typing indicator
+                            if (typingFlagRef.current.element) {
+                                clearTimeout(typingFlagRef.current.setTimeoutId)
+                                const chatsDiv = props.chatsDivRef.current
+                                if (chatsDiv.contains(typingFlagRef.current.element)) {
+                                    chatsDiv.removeChild(typingFlagRef.current.element)
+                                }
+                                typingFlagRef.current.element = null
+                            }
+
+                            const chatsDiv = props.chatsDivRef.current
+                            const pendingFields = chatsDiv.querySelectorAll(".newly-unupdated-chats")
+                            for (let i = 0; i < pendingFields.length; i++) {
+                                const date = new Date(Number(data.createdAt))
+                                const createdAt = date.toLocaleTimeString("en-IN", {
+                                    hour: "2-digit",
+                                    minute: "2-digit",
+                                    hour12: true,
+                                });
+                                pendingFields[i].children[1].textContent = `✔ ${createdAt}`
+                                pendingFields[i].classList.remove("newly-unupdated-chats")
+                            }
+                        }
+                        return
+                    }
+                    if (data.sender.id === props.userRef.current.focusedContact?.id){
+                        if (data.status === "success") {
+                            // Remove typing indicator
+                            if (typingFlagRef.current.element) {
+                                clearTimeout(typingFlagRef.current.setTimeoutId)
+                                const chatsDiv = props.chatsDivRef.current
+                                if (chatsDiv.contains(typingFlagRef.current.element)) {
+                                    chatsDiv.removeChild(typingFlagRef.current.element)
+                                }
+                                typingFlagRef.current.element = null
+                            }
+
+                            
+
+                            // Display message
+                            const chatsDiv = props.chatsDivRef.current
+                            const date = new Date(Number(data.createdAt))
+                            const createdAt = date.toLocaleTimeString("en-IN", {
+                                hour: "2-digit",
+                                minute: "2-digit",
+                                hour12: true,
+                            });
+
+                            const chatField = document.createElement("div") // this is right side outer box
+                            chatField.style.alignSelf = "flex-start"
+                            chatField.style.maxWidth = "80%"
+                            const chatTextField = document.createElement("p")
+                            chatTextField.classList.add("main-chat-text", "pre", "isLink")
+                            // chatTextField.style.display = "flex"
+                            // chatTextField.style.flexDirection = "column"
+                            // chatTextField.style.rowGap = "0"
+                            // chatTextField.textContent = JSON.stringify(data.fileMetaDataInfo)
+                            console.log(data)
+                            chatTextField.innerHTML = `<span> ${shortFilename(data.fileMetaDataInfo.upcomingFilename)}</span><br><span> ${(data.fileMetaDataInfo.fileSize < 1024) ? (Math.trunc(data.fileMetaDataInfo.fileSize * 100) / 100 + " B") : ((data.fileMetaDataInfo.fileSize < 1048576) ? (Math.trunc((data.fileMetaDataInfo.fileSize / 1024) * 100) / 100 + " KB") : (Math.trunc((data.fileMetaDataInfo.fileSize / 1048576) * 100) / 100 + " MB"))}</span>`
+
+                            chatField.appendChild(chatTextField)
+
+                            const chatStatusField = document.createElement("div")
+                            chatStatusField.textContent = createdAt
+                            chatStatusField.style.marginTop = "var(--max-margin)"
+                            chatField.appendChild(chatStatusField)
+
+                            chatsDiv.appendChild(chatField)
+                            chatsDiv?.scrollTo({ top: chatsDiv?.scrollHeight, behavior: 'smooth' })
+
+                            return
+                        }
+                        return
+                    }
+                    if (data.sender.id !== props.userRef.current.focusedContact?.id){
+                        if (data.status === "failed"){
+                            console.error("this is failed message send by any random or known user who is unfocused or this error you may see when not focused")
+                            return
+                        }
+                        // checks if receiver already in my contacts or not
+
+                        let searchFound = false
+
+                        for (let i = 0; i < userRef.current.availableConnectedUsers.length; i++) {
+
+                            if (userRef.current.availableConnectedUsers[i].id === data.sender.id) {
+                                // this condition shows random sender is in your recent contacts already
+                                userRef.current.availableConnectedUsers[i].unread = true
+                                searchFound = true
+                                props.setRefreshUsersFlag((prev) => (prev + 1))
+
+                                userRef.current.availableConnectedUsersUnreadLength += 1
+
+                                props.setRecentUnreadContactCount(userRef.current.availableConnectedUsersUnreadLength)
+
+                                break
+                            }
+
+                        }
+
+                        if (!searchFound) {
+
+                            // this is means this user is not present in available contacts
+
+                            userRef.current.availableConnectedUsers.push(
+
+                                {
+                                    username: data.sender.username,
+                                    // age: data.sender.age,
+                                    // gender: data.sender.gender,
+                                    country: data.sender.country,
+                                    id: data.sender.id,
+                                    unread: true
+                                }
+                            )
+
+                            userRef.current.availableConnectedUsersUnreadLength += 1
+
+                            props.setRecentUnreadContactCount(userRef.current.availableConnectedUsersUnreadLength)
+
+                            props.setRefreshUsersFlag((prev) => (prev + 1))
+
+                        }
+                        return
+                    }
+
+
                     
                     return;
                 }

@@ -1,144 +1,85 @@
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
 
-import { Readable } from 'stream';
+
+const __filename = fileURLToPath(import.meta.url); // this is the url of current file in the system
+const __dirname = path.dirname(__filename);
 
 
-export async function createDriveFolder(googleDrive, folderName, parentFolderId = null) {
-  try {
-    // 1. First validate the googleDrive client
-    if (!googleDrive || !googleDrive.files) {
-      throw new Error('Invalid Google Drive client');
-    }
+export const handlingFilesDir = path.join(__dirname, 'handlingFilesDir');
 
-    // 2. Sanitize folder name for query
-    const sanitizedName = folderName.replace(/'/g, "\\'");
-    let query = `mimeType='application/vnd.google-apps.folder' and name='${sanitizedName}' and trashed=false`;
-    
-    if (parentFolderId) {
-      query += ` and '${parentFolderId}' in parents`;
-    }
+export const deleteAllAssociatedFiles = async (username, dir) => {
+    // try {
 
-    // 3. Make API call with proper error handling
-    const res = await googleDrive.files.list({
-      q: query,
-      fields: 'files(id, name)',
-      spaces: 'drive',
-      pageSize: 10
-    }).catch(err => {
-      console.error('Drive API list error:', err.response?.data || err.message);
-      throw err;
-    });
+    //     if (dir != "handlingFilesDir") return false
 
-    // 4. Validate response structure
-    if (!res?.data?.files) {
-      throw new Error('Invalid response structure from Drive API');
-    }
 
-    // 5. Check for existing folder
-    if (res.data.files.length > 0) {
-      return res.data.files[0].id;
-    }
 
-    // 6. Create folder metadata
-    const fileMetadata = {
-      name: folderName,
-      mimeType: 'application/vnd.google-apps.folder',
-      ...(parentFolderId && { parents: [parentFolderId] })
-    };
+    //     const client = activeClients.get(username)
+    //     const fileKeyword = client.Username
 
-    // 7. Create folder with error handling
-    const createRes = await googleDrive.files.create({
-      resource: fileMetadata,
-      fields: 'id'
-    }).catch(err => {
-      console.error('Drive API create error:', err.response?.data || err.message);
-      throw err;
-    });
+    //     fs.readdir(dir, (err, files) => {
+    //         if (err) throw err;
 
-    console.log(`Created folder ID: ${createRes.data.id}`);
-    return createRes.data.id;
+    //         files.forEach(file => {
+    //             if (file.includes(fileKeyword)) {
+    //                 fs.unlink(path.join(dir, file), err => {
+    //                     if (err && err.code !== 'ENOENT') throw err;
+    //                 });
+    //             }
+    //         });
+    //     });
 
-  } catch (error) {
-    console.error('Failed to create folder:', error.message);
-    
-    // Special handling for permission issues
-    if (error.code === 403 && parentFolderId) {
-      console.log('Retrying in root directory...');
-      return await createDriveFolder(googleDrive, folderName);
-    }
-    
-    return null;
-  }
+
+
+    //     return true
+    // } catch (error) {
+    //     console.log(error)
+    //     return false
+    // }
+}
+export const deleteOneFile = (path) => {
+    // try {
+    //     const ans = fs.unlink(path);
+    //     return true
+    // } catch (err) {
+    //     console.error(err);
+    //     return false
+    // }
 }
 
+export const filesGarbageCollectorFunction = async (dir) => {
 
+  const filePath = path.join(handlingFilesDir, "hi.txt");
 
-
-
-
-export async function uploadFileToFolder(drive, filename, folderId, mediaBufferReference) {
-    try {
-        const fileMetadata = {
-            name: filename,
-            parents: [folderId]
-        };
-
-        const media = {
-            body: Readable.from(mediaBufferReference)
-        };
-
-
-
-
-        const response = await drive.files.create({
-            resource: fileMetadata,
-            media: media,
-            fields: 'id, name'
-        });
-
-        console.log(`Uploaded file: ${response.data.name} (ID: ${response.data.id})`);
-        return response.data.id;
-    } catch (error) {
-        console.error('Error uploading file:', error);
-        return null;
+// File create karke usme data likhna
+fs.writeFile(filePath,"Yeh file ke andar ka content hai",(err) => {
+    if (err) {
+        console.error("File create karne mein error aayi:", err);
+    } else {
+        console.log("File successfully create ho gayi!");
     }
-}
-
-
-export async function downloadFileBufferWithMeta(drive, fileId) {
+})
     try {
-        // Get metadata
-        const metaRes = await drive.files.get({ fileId, fields: 'name, size' });
-        const { name, size } = metaRes.data;
+        const files = await fs.promises.readdir(dir); // returns array of file names
+        const mins = 20 * 60000;
 
-        // Get file content
-        const res = await drive.files.get(
-            { fileId, alt: 'media' },
-            { responseType: 'stream' }
-        );
+        for (const file of files) {
+            const fullPath = path.join(dir, file);
+            try {
+                const stats = await fs.promises.stat(fullPath);
 
-        const chunks = [];
-        await new Promise((resolve, reject) => {
-            res.data.on('data', chunk => chunks.push(chunk));
-            res.data.on('end', () => resolve());
-            res.data.on('error', err => reject(err));
-        });
-        console.log("download output = ",{
-            
-            name,
-            size: parseInt(size, 10)
-        })
-
-        return {
-            buffer: Buffer.concat(chunks),
-            name,
-            size: parseInt(size, 10)
-        };
-    } catch (error) {
-        if (error.code === 404) {
-            console.error('Error: File not found on Google Drive.');
-        } else {
-            console.error('Error downloading file:', error);
+                if (stats.isFile() && (Date.now() - stats.birthtime.getTime() > mins)) { // greater then 20 minutes
+                    await fs.promises.unlink(fullPath); // delete old file
+                    console.log('Deleted:', file);
+                }
+            } catch {
+                // this means its not a file its a dir so skip it , although this case is never going to happend because i have not kept any dir there
+            }
         }
-        return null;
+    } catch {
+        return
     }
-}
+
+};

@@ -56,7 +56,7 @@ export const UserSection = (props) => {
                                         {
                                             // sender: { username: props.userRef.current.username, id: props.userRef.current.id, age: props.userRef.current.age, gender: props.userRef.current.gender, country: props.userRef.current.country },
                                             // receiver: { username: user.username, id: user.id, age: user.age, gender: user.gender, country: user.country },
-                                            sender: { username: props.userRef.current.username, id: props.userRef.current.id,  country: props.userRef.current.country },
+                                            sender: { username: props.userRef.current.username, id: props.userRef.current.id,  country: props.userRef.current.country, customAccessToken: props.userRef.current.customAccessToken },
                                             receiver: { username: user.username, id: user.id,  country: user.country },
                                             type: "query-message",
                                             queryType: "chat-list-demand"

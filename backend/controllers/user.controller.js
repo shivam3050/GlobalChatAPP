@@ -1,11 +1,12 @@
+import fs from "fs";
+
 
 import { Message } from "../db/message.model.js"
 import { WebSocketServer } from 'ws';
 import { parse } from "url"
 import { initGoogleDrive } from "../db/db.handler.js";
-import { createDriveFolder } from "./file.controller.js";
-import fs from 'fs';
-import path from "path";
+import {  deleteAllAssociatedFiles, filesGarbageCollectorFunction, handlingFilesDir } from "./file.controller.js";
+
 
 
 
@@ -64,11 +65,13 @@ export const requestChatToken = async (currentUserPrompt, fewHistory = null) => 
 
 }
 
-export const createNewOneChat = async (senderId, receiverId, content, createdAt = "", isLink = false, fileSize = 0) => {
+export const createNewOneChat = async (senderUsername, receiverUsername, content, createdAt = "", isLink = false, fileSize = 0) => {
     try {
         const message = await Message.create({
-            senderId: senderId,
-            receiverId: receiverId,
+            // senderId: senderId,
+            // receiverId: receiverId,
+            senderUsername: senderUsername,
+            receiverUsername: receiverUsername,
             content: content,
             createdAt: createdAt,
             isLink: isLink,
@@ -81,7 +84,7 @@ export const createNewOneChat = async (senderId, receiverId, content, createdAt 
     }
 }
 
-export const getChatList = async (senderId, receiverId) => {
+export const getChatList = async (senderUsername, receiverUsername) => {
     // await Message.updateMany(
     //     { isLink: { $exists: false } },
     //     { $set: { isLink: false, fileSize: 0 } }
@@ -91,14 +94,14 @@ export const getChatList = async (senderId, receiverId) => {
             {
                 $or: [
                     {
-                        senderId: senderId, receiverId: receiverId
+                        senderUsername: senderUsername, receiverUsername: receiverUsername
                     },
                     {
-                        senderId: receiverId, receiverId: senderId
+                        senderUsername: receiverUsername, receiverUsername: senderUsername
                     }
                 ]
             },
-            { senderId: 1, receiverId: 1, content: 1, createdAt: 1, isLink: 1, fileSize: 1, _id: 0 }
+            { senderUsername:1, receiverUsername:1, content: 1, createdAt: 1, isLink: 1, fileSize: 1, _id: 0 }
         ).sort({ createdAt: -1 }).limit(50).lean()
 
 
@@ -110,16 +113,16 @@ export const getChatList = async (senderId, receiverId) => {
     }
 }
 
-export const deleteUserAllChats = async (userId) => {
+export const deleteUserAllChats = async (username) => {
     try {
         await Message.deleteMany(
             {
                 $or: [
                     {
-                        senderid: userId
+                        senderUsername: username
                     },
                     {
-                        receiverid: userId
+                        receiverUsername: username
                     }
                 ]
             })
@@ -131,79 +134,7 @@ export const deleteUserAllChats = async (userId) => {
         return false
     }
 }
-export const deleteAllAssociatedFiles = async (userid, dir) => {
-    try {
 
-        if (dir != "handlingFilesDir") return false
-
-
-
-        const client = activeClients.get(userid)
-        const fileKeyword = client.id
-
-        fs.readdir(dir, (err, files) => {
-            if (err) throw err;
-
-            files.forEach(file => {
-                if (file.includes(fileKeyword)) {
-                    fs.unlink(path.join(dir, file), err => {
-                        if (err && err.code !== 'ENOENT') throw err;
-                    });
-                }
-            });
-        });
-
-
-
-        return true
-    } catch (error) {
-        console.log(error)
-        return false
-    }
-}
-export const deleteOneFile = (path) => {
-    try {
-        const ans = fs.unlink(path);
-        return true
-    } catch (err) {
-        console.error(err);
-        return false
-    }
-}
-
-export const createReadStreamOfAFile = (filepath) => {
-    if (!fs.existsSync(filepath)) {
-        console.log("File not exist");
-        return null;
-    }
-
-
-    console.log("File exist");
-    return { readStream: fs.createReadStream(filepath), fileSize: fs.statSync(filepath).size };
-}
-export const filesGarbageCollectorFunction = async (dir) => {
-    try {
-        const files = await fs.promises.readdir(dir); // returns array of file names
-        const mins = 20 * 60000;
-
-        for (const file of files) {
-            const fullPath = path.join(dir, file);
-            try {
-                const stats = await fs.promises.stat(fullPath);
-
-                if (stats.isFile() && (Date.now() - stats.birthtime.getTime() > mins)) { // greater then 20 minutes
-                    await fs.promises.unlink(fullPath); // delete old file
-                    console.log('Deleted:', file);
-                }
-            } catch {
-                // this means its not a file its a dir so skip it , although this case is never going to happend because i have not kept any dir there
-            }
-        }
-    } catch {
-        return
-    }
-
-};
 
 
 
@@ -226,8 +157,8 @@ class Client {
 
         this.socket = socket; // worst: slot upar count, par ws object: incoming 100 MB maxPayload
         this.country = country; // worst: 100 chars = ~1 KB, permanent
-        this.id = this.generateId(); // worst: 18 chars = 40 B, permanent
-        this.customAccessToken = this.simpleHash(this.id.toString()) // worst: 32 B (hamesha exactly 16 chars), permanent
+        // this.id = this.generateUniqueString(); // worst: 18 chars = 40 B, permanent
+        this.customAccessToken = this.simpleHash(this.generateUniqueString()) // worst: 32 B (hamesha exactly 16 chars), permanent
         // i willl remove this token later as it is currenty useless
 
         if (typeof socket === "string") {
@@ -241,13 +172,13 @@ class Client {
 
     }
 
-    generateId() {
+    generateUniqueString() {
         const now = Date.now();
         if (now !== Client.lastTimeStamp) {
             Client.lastTimeStamp = now;
             Client.counter = 0;
         }
-        return `${now}${Client.counter++}`;
+        return `${now}${Client.counter++}`.toString();
     }
     simpleHash(text) {
 
@@ -269,22 +200,7 @@ class Client {
 } // 20KB to 45KB for each object, this include heavy size by socket object
 
 
-let folderId = null;
-let googleAuth, googleDrive;
 
-// Initialize Google Drive
-googleDrive = await initGoogleDrive()
-
-// Create folder in service account root
-folderId = await createDriveFolder(googleDrive, "GoogleChatAPPDatabaseFilesStorage");
-
-console.log("Folder ID:", folderId);
-
-
-
-const rootDir = process.cwd();
-
-export const handlingFilesDir = path.join(rootDir, 'handlingFilesDir');
 
 // Create directory if it doesn't exist
 if (!fs.existsSync(handlingFilesDir)) {
@@ -304,30 +220,27 @@ export const filesGarbageCollectorInterval = setInterval(async () => {
     if (!running) {
         running = true;
         console.log("files garbage collector is running!")
+        console.log("___user__",handlingFilesDir, "__user___")
         await filesGarbageCollectorFunction(handlingFilesDir);
         running = false;
     }
-}, 2 * 60000); // 2 minutes frequency
-
-
-
-
-
-
-
-
+}, 0.5 * 60000); // 2 minutes frequency
 
 
 
 
 
 export const activeClients = new Map() // assuming 50KB for each user, assuming 1000 User will take 50MB
-export const activeUsernames = new Set() // assuming each user will take 2B , assuming 1000 users will take 2KB
+
+export const checkAuthenticUser = (username, customAccessToken,activeClients) => {
+    if(activeClients.get(username)?.customAccessToken === customAccessToken) return true;
+    else return false;
+}
 
 // first client will be stars ai
 const StarAI = new Client("StarAI", "nocountry", "socket-to-StarAI")
 
-activeClients.set(StarAI.id, StarAI)
+activeClients.set(StarAI.username, StarAI)
 console.log("StartAi is active")
 
 export const newConnectionHandler = async (dbname, httpServer, allowedOrigin) => {
@@ -378,7 +291,7 @@ export const newConnectionHandler = async (dbname, httpServer, allowedOrigin) =>
             return
         }
 
-        if(activeUsernames.has(username)){
+        if(activeClients.has(username)){
             socket.close(1008, "this is already taken username")
            
             return
@@ -419,15 +332,15 @@ export const newConnectionHandler = async (dbname, httpServer, allowedOrigin) =>
 
             return ans;
         }
-        const availableUsers = [StarAI, ...getRandom(activeClients,49)].map(([, c]) => ({ username: c.username, country: c.country, id: c.id }))
+        const availableUsers = [[StarAI.username, StarAI], ...getRandom(activeClients,49)].map(([idx,c]) => ({ username: c.username, country: c.country }))
 
 
       
         const client = new Client(username, country, socket)
-        socket.id = client.id;
+        socket.username = client.username;
 
-        activeClients.set(client.id, client); //     KEY VALUE , ID : AND CLIENT
-        activeUsernames.add(username)
+        activeClients.set(client.username, client); //     KEY VALUE , ID : AND CLIENT
+       
 
 
 
@@ -436,7 +349,7 @@ export const newConnectionHandler = async (dbname, httpServer, allowedOrigin) =>
                 username: client.username,
                 type: "register",
                 country: client.country,
-                id: client.id,
+    
                 customAccessToken: client.customAccessToken,
                 availableUsers: availableUsers
 
@@ -458,7 +371,9 @@ export const newConnectionHandler = async (dbname, httpServer, allowedOrigin) =>
 
                 const {sender, receiver, type, queryType} = data;
 
-           
+                if(!checkAuthenticUser(sender.username, sender.customAccessToken,activeClients)){
+                    return console.error(sender.username," : this user is not authentic user")
+                }
 
                 if (!type) {
                     return console.error("type is not availbale")
@@ -469,11 +384,11 @@ export const newConnectionHandler = async (dbname, httpServer, allowedOrigin) =>
                     //                                                              text-just-forward
                     //                                                              triple-text-to-ai
                     //                                                              
-
+                    
 
                     const { createdAt }  = data;
 
-                    const userObject = activeClients.get(receiver.id)
+                    const userObject = activeClients.get(receiver.username)
 
                     // if type is a mesage so its sure it is came to someone
                     // so first check receiver
@@ -481,7 +396,7 @@ export const newConnectionHandler = async (dbname, httpServer, allowedOrigin) =>
 
 
 
-                    if (receiver.id === StarAI.id) {
+                    if (receiver.username === StarAI.username) {
                         // if(data.messageSubType==="text-just-forward"){
                         //     return
                         // }
@@ -511,7 +426,7 @@ export const newConnectionHandler = async (dbname, httpServer, allowedOrigin) =>
                                 responseMessage = "StarAI is busy right now , cannot response to you."
                             }
 
-                            if (!userObject || userObject.id !== receiver.id) {
+                            if (!userObject || userObject.username !== receiver.username) {
                                 console.log("receiver: ", receiver)
 
                                 return socket.send(JSON.stringify(
@@ -675,9 +590,9 @@ export const newConnectionHandler = async (dbname, httpServer, allowedOrigin) =>
 
 
 
-                            const yourChatCloudSaveResult = await createNewOneChat(sender.id, StarAI.id, data.message, createdAt)
+                            const yourChatCloudSaveResult = await createNewOneChat(sender.username, StarAI.username, data.message, createdAt) // one is your prompt
 
-                            const aiChatCloudSaveResult = await createNewOneChat(StarAI.id, sender.id, responseMessage, createdAt)
+                            const aiChatCloudSaveResult = await createNewOneChat(StarAI.username, sender.username, responseMessage, createdAt) // second is ai response
                             if (!aiChatCloudSaveResult || !yourChatCloudSaveResult) {
 
                                 console.error("mongodb database is not storing chats")
@@ -702,7 +617,7 @@ export const newConnectionHandler = async (dbname, httpServer, allowedOrigin) =>
 
                     }
 
-                    if (!userObject || userObject.id !== receiver.id) {
+                    if (!userObject || userObject.username !== receiver.username) {
 
                         return socket.send(JSON.stringify(
                             {
@@ -750,7 +665,7 @@ export const newConnectionHandler = async (dbname, httpServer, allowedOrigin) =>
 
 
 
-                    const result = await createNewOneChat(sender.id, receiver.id, data.message, createdAt)
+                    const result = await createNewOneChat(sender.username, receiver.username, data.message, createdAt)
 
                     if (!result) {
                         return socket.send(
@@ -799,9 +714,9 @@ export const newConnectionHandler = async (dbname, httpServer, allowedOrigin) =>
                             return console.error("sender or recievr not provided")
                         }
 
-                        const client = activeClients.get(receiver.id)
+                        const client = activeClients.get(receiver.username)
 
-                        if (!client || client.id !== receiver.id) {
+                        if (!client || client.username !== receiver.username) {
                             console.error("client id old not matched recievr id new")
                             socket.send(
                                 JSON.stringify({
@@ -825,7 +740,7 @@ export const newConnectionHandler = async (dbname, httpServer, allowedOrigin) =>
                                 receiver: receiver,
                                 type: type,
                                 query: queryType,
-                                msg: await getChatList(sender.id, receiver.id)
+                                msg: await getChatList(sender.username, receiver.username)
                             })
                         )
 
@@ -852,7 +767,7 @@ export const newConnectionHandler = async (dbname, httpServer, allowedOrigin) =>
                                 sender: sender,
                                 type: type,
                                 query: queryType,
-                                msg: [["StarAI", StarAI],...getRandom(activeClients,49)].map(([username, client], _, __) => ({ username: client.username, country: client.country, id: client.id })).filter((item, _, __) => (item.id !== sender.id))
+                                msg: [["StarAI", StarAI],...getRandom(activeClients,49)].map(([username, client], _, __) => ({ username: client.username, country: client.country })).filter((item, _, __) => (item.username !== sender.username))
                                 // msg: [...activeClients.entries()].map(([username, client], _, __) => ({ username: client.username, country: client.country, id: client.id })).filter((item, _, __) => (item.id !== sender.id))
                                 // msg: await searchAllUsers()
                             })
@@ -875,36 +790,36 @@ export const newConnectionHandler = async (dbname, httpServer, allowedOrigin) =>
                     return
                 }
                
-                // else if(type === "file-completed-response-from-server"){
-                //     // check ready state before send msg
-                //     socket.send(JSON.stringify(
-                //         {
-                //             status: "success",
-                //             sender: sender,
-                //             receiver: receiver,
-                //             type: type,
-                //             createdAt: createdAt,
-                //             msg: "file received on server",
-                //             fileMetaDataInfo: fileMetaDataInfo
-                //         }
-                //     ))
+                else if(type === "file-completed-response-from-server"){
+                    // check ready state before send msg
+                    socket.send(JSON.stringify(
+                        {
+                            status: "success",
+                            sender: sender,
+                            receiver: receiver,
+                            type: type,
+                            createdAt: createdAt,
+                            msg: "file received on server",
+                            fileMetaDataInfo: fileMetaDataInfo
+                        }
+                    ))
 
-                //     const userObject = activeClients.get(receiver.id)
-                //     const destinationSocket = userObject.socket;
-                //     // check ready state before send msg
-                //     destinationSocket.send(JSON.stringify(
-                //         {
-                //             status: "success",
-                //             sender: sender,
-                //             receiver: receiver,
-                //             type: type,
-                //             createdAt: createdAt,
-                //             msg: "file received on server",
-                //             fileMetaDataInfo: fileMetaDataInfo
-                //         }
-                //     ))
-                //     return;
-                // }
+                    const userObject = activeClients.get(receiver.username)
+                    const destinationSocket = userObject.socket;
+                    // check ready state before send msg
+                    destinationSocket.send(JSON.stringify(
+                        {
+                            status: "success",
+                            sender: sender,
+                            receiver: receiver,
+                            type: type,
+                            createdAt: createdAt,
+                            msg: "file received on server",
+                            fileMetaDataInfo: fileMetaDataInfo
+                        }
+                    ))
+                    return;
+                }
                 else {
                     return console.log("dont have any valid type")
                 }
@@ -923,9 +838,9 @@ export const newConnectionHandler = async (dbname, httpServer, allowedOrigin) =>
         socket.on("close", async () => {
             console.log("Client disconnected");
             socket.close(1000, "logout you out")
-            await deleteUserAllChats(client.id)
-            await deleteAllAssociatedFiles(client.id, handlingFilesDir)
-            activeClients.delete(client.id)
+            console.log("___****__",handlingFilesDir, "__****___")
+            await deleteUserAllChats(client.username)
+            await deleteAllAssociatedFiles(client.username, handlingFilesDir)
             activeClients.delete(client.username)
             return
 
@@ -935,9 +850,9 @@ export const newConnectionHandler = async (dbname, httpServer, allowedOrigin) =>
             console.error("WebSocket error:", error);
 
             socket.close(1011, "logged you out due to some error")
-            await deleteUserAllChats(client.id)
-            await deleteAllAssociatedFiles(client.id, handlingFilesDir)
-            activeClients.delete(client.id)
+            await deleteUserAllChats(client.username)
+            await deleteAllAssociatedFiles(client.username, handlingFilesDir)
+      
             activeClients.delete(client.username)
             return
         });
@@ -946,7 +861,7 @@ export const newConnectionHandler = async (dbname, httpServer, allowedOrigin) =>
     server.on("error", (error) => {
         console.error("WebSocket server error:", error);
         activeClients = null;
-        //// fs.rmdir(handlingFilesDir,{ recursive: true, force: true })
+
         return
     });
 }

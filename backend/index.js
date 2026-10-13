@@ -5,11 +5,12 @@ import fs from "fs"
 
 
 
-import { activeClients, createNewOneChat, createReadStreamOfAFile, deleteOneFile, handlingFilesDir, newConnectionHandler } from "./controllers/user.controller.js"
+import { activeClients, checkAuthenticUser, createNewOneChat,   newConnectionHandler } from "./controllers/user.controller.js"
 import { connectDB } from './db/db.handler.js';
 import path from 'path';
 
 import dns from 'dns';
+import { deleteOneFile, handlingFilesDir } from './controllers/file.controller.js';
 dns.setServers(['8.8.8.8', '8.8.4.4']);
 
 
@@ -23,7 +24,7 @@ connectDB().then((dbname) => {
                 'Content-Type': 'text/plain',
                 'Access-Control-Allow-Origin': "*",
                 'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-                "Access-Control-Allow-Headers": "Content-Type, X-Custom-Access-Token, X-Filename, X-Modified-Filename, X-Sender-Id, X-Receiver-Id, X-Created-At"
+                "Access-Control-Allow-Headers": "Content-Type, X-Custom-Access-Token, X-Filename, X-Modified-Filename, X-Sender-Id, X-Receiver-Id, X-Created-At, X-Sender-Username, X-Receiver-Username"
             }
 
             if (req.method === "OPTIONS") {
@@ -42,14 +43,14 @@ connectDB().then((dbname) => {
                     return;
                 }
 
-                // verify encrypted token came from header
-                // lets assume token has verified
 
-                const senderId = req.headers["x-sender-id"]
-                const receiverId = req.headers["x-receiver-id"]
+             
+                const senderUsername = req.headers["x-sender-username"]
+            
+                const receiverUsername = req.headers["x-receiver-username"]
                 const timestamp = req.headers["x-created-at"]
 
-                if (!senderId || !receiverId) {
+                if (!senderUsername || !receiverUsername) {
                     res.writeHead(404, headers);
                     res.end("Missing ids"); // so that browser can stop hang up
                     return;
@@ -60,8 +61,9 @@ connectDB().then((dbname) => {
                     return;
                 }
 
-                const sender = activeClients.get(senderId)
-                const receiver = activeClients.get(receiverId)
+                const sender = activeClients.get(senderUsername)
+                const receiver = activeClients.get(receiverUsername)
+
 
                 if (!sender || !receiver) {
                     res.writeHead(404, headers);
@@ -69,14 +71,37 @@ connectDB().then((dbname) => {
                     return;
                 }
 
-                // if success check user existence and send him file
-
-                const { readStream, sizeOnDisk } = createReadStreamOfAFile(path.join(handlingFilesDir, modifiedFileName));
-                if (!readStream) {
+                if(!checkAuthenticUser(sender.username,sender.customAccessToken,activeClients)){
                     res.writeHead(404, headers);
-                    res.end("File not found")
+                    res.end("you are not genuine user");
                     return
                 }
+
+                
+
+                
+                const username1 = modifiedFileName.split("_")[0]
+                const username2 = modifiedFileName.split("_")[1]
+                
+                if(!(sender.username === username1 || sender.username === username2 ||
+                    receiver.username === username1 || receiver.username === username2
+                )) {
+                    res.writeHead(404, headers);
+                    res.end("you dont have permission to acces this file");
+                    return
+                }
+
+
+
+
+                if(!fs.existsSync(path.join(handlingFilesDir, modifiedFileName))){
+                    res.writeHead(404, headers);
+                    res.end("file not available on server");
+                    return
+                } 
+
+
+                const readStream = fs.createReadStream(path.join(handlingFilesDir, modifiedFileName))
                 res.writeHead(200, {
                     ...headers,
                     'Content-Type': 'application/octet-stream',
@@ -93,6 +118,7 @@ connectDB().then((dbname) => {
                 return
             }
             if (req.url.startsWith("/upload-file") && req.method === "POST") {
+             
                 // verify encrypted token came from header
                 const customAccessToken = req.headers["x-custom-access-token"]
                 const filename = req.headers["x-filename"]
@@ -100,40 +126,51 @@ connectDB().then((dbname) => {
                 if (!customAccessToken || !filename) {
                     res.writeHead(404);
                     res.end("Missing tokens"); // so that browser can stop hang up
+                    console.log("missing the tokn")
                     return;
                 }
-                const senderId = req.headers["x-sender-id"]
-                const receiverId = req.headers["x-receiver-id"]
+                const senderUsername = req.headers["x-sender-username"]
+                const receiverUsername = req.headers["x-receiver-username"]
                 const timestamp = req.headers["x-created-at"]
+                
 
-                if (!senderId || !receiverId) {
+                if (!senderUsername || !receiverUsername) {
                     res.writeHead(404, headers);
                     res.end("Missing ids"); // so that browser can stop hang up
+                    console.log("Missing ids")
                     return;
                 }
                 if (!timestamp) {
                     res.writeHead(404, headers);
                     res.end();
+                    console.log("timestamp nahi diya")
                     return;
                 }
 
-                const sender = activeClients.get(senderId)
-                const receiver = activeClients.get(receiverId)
+                const sender = activeClients.get(senderUsername)
+         
+                const receiver = activeClients.get(receiverUsername)
 
                 if (!sender || !receiver) {
                     res.writeHead(404, headers);
                     res.end("Sender or receiver gone offline"); // so that browser can stop hang up
+                    console.log("Sender or receiver gone offline")
                     return;
                 }
 
-                // lets assume token verified
-                // token is of no use , i will remove the data token too later on
+                if(!checkAuthenticUser(sender.username,sender.customAccessToken,activeClients)){
+                    res.writeHead(404, headers);
+                    res.end("you are not genuine user");
+                    console.log("you are not genuine user")
+                    return
+                }
 
                 // here i for same timestamp i will add a unique counter so to avoid same timestaps in case of upload in same milisecond
-                const modifiedFileName = sender.id + "_" + receiver.id + "_" + timestamp + "_" + filename;
-
+                const modifiedFileName = sender.username + "_" + receiver.username + "_" + timestamp + "_" + filename;
+                
 
                 const writeStream = fs.createWriteStream(path.join(handlingFilesDir, modifiedFileName))
+
                 req.pipe(writeStream);
 
                 writeStream.on("finish", async () => {
@@ -141,7 +178,7 @@ connectDB().then((dbname) => {
 
                     const sizeOnDisk = fs.statSync(path.join(handlingFilesDir, modifiedFileName)).size
 
-                    const result = await createNewOneChat(sender.id, receiver.id, modifiedFileName, timestamp, true, sizeOnDisk)
+                    const result = await createNewOneChat(sender.id, receiver.id, sender.username,receiver.username, modifiedFileName, timestamp, true, sizeOnDisk)
 
                     if (!result) {
                         deleteOneFile(path.join(handlingFilesDir, modifiedFileName))
@@ -158,6 +195,7 @@ connectDB().then((dbname) => {
                     }
 
                     // do alert to both about this information that your file has been stored
+
                     receiver.socket.send(JSON.stringify(
                         {
                             status: "success",
@@ -166,8 +204,7 @@ connectDB().then((dbname) => {
                             type: "file-completed-response-from-server",
                             createdAt: timestamp,
                             msg: "file received on server",
-                            upcomingFilename: modifiedFileName,
-                            fileSize: sizeOnDisk
+                            fileMetaDataInfo: { upcomingFilename: modifiedFileName, fileSize: sizeOnDisk }
                         }
                     ))
                     console.log("File upload complete.");

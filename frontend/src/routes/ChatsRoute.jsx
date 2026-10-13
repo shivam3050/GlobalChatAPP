@@ -142,8 +142,8 @@ function ChatsRoute(props) {
                                 "Content-Type": "application/octet-stream",
                                 "X-Filename": file.name,
                                 "X-Custom-Access-Token": props.userRef.current.customAccessToken, // i will remove this token later, it is useless
-                                "X-Sender-Id": props.userRef.current.id,
-                                "X-Receiver-Id": props.userRef.current.focusedContact.id,
+                                "X-Sender-Username": props.userRef.current.username,
+                                "X-Receiver-Username": props.userRef.current.focusedContact.username,
                                 "X-Created-At": timestamp
 
                             },
@@ -213,7 +213,7 @@ function ChatsRoute(props) {
                     chatTextField.textContent = message
 
                     const speakMessage = document.createElement("span")
-                    speakMessage.textContent = "▶"
+                    speakMessage.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" fill="currentColor" /><path d="M15.5 8.5a5 5 0 0 1 0 7" /><path d="M19 5a10 10 0 0 1 0 14" /></svg>`
                     // give a class to it
                     speakMessage.classList.add("hovereffectbtn")
                     speakMessage.classList.add("playAnyMessageBtn")
@@ -244,7 +244,7 @@ function ChatsRoute(props) {
                                 createdAt: timestamp,
                                 receiver: props.userRef.current.focusedContact,
                                 // sender: { username: props.userRef.current.username, id: props.userRef.current.id, age: props.userRef.current.age, gender: props.userRef.current.gender, country: props.userRef.current.country }
-                                sender: { username: props.userRef.current.username, id: props.userRef.current.id, country: props.userRef.current.country }
+                                sender: { username: props.userRef.current.username, id: props.userRef.current.id, country: props.userRef.current.country, customAccessToken: props.userRef.current.customAccessToken }
                             }
                         )
                     )
