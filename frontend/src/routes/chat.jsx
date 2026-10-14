@@ -246,16 +246,16 @@ export const ChatSection = (props) => {
         return (
           <div
 
-            className={(item.senderId === props.userRef.current.id) ? "background-gradient-in-chat" : ""}
+            className={(item.senderUsername === props.userRef.current.username) ? "background-gradient-in-chat" : ""}
             style={
               {
 
-                alignSelf: (item.senderId === props.userRef.current.id) ? ("flex-end") : ("flex-start")
+                alignSelf: (item.senderUsername === props.userRef.current.username) ? ("flex-end") : ("flex-start")
               }
             } key={index}>
 
             {
-              (item.senderId === props.userRef.current.id || item.senderId !== props.userRef.current.yourGlobalStarAiReference.id) ? (
+              (item.senderUsername === props.userRef.current.username || item.senderUsername !== props.userRef.current.yourGlobalStarAiReference.username) ? (
                 <>
                   <p className={`main-chat-text pre ${item.isLink ? "isLink" : ""}`} onClick={(item.isLink) ? (async() => {
                     // if (props.socketContainer.current.isStillDownloading) {
@@ -337,7 +337,8 @@ export const ChatSection = (props) => {
 
                   <div className="chatTextStatus">
 
-                    {(item.senderId === props.userRef.current.id) ? (`✔ ${createdAt}`) : (createdAt)}
+                    {(item.senderUsername === props.userRef.current.username) ? (`✔ ${createdAt}`) : (createdAt)}
+
                   </div>
                 </>
               ) : (

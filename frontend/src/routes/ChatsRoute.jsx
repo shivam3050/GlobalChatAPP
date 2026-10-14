@@ -4,7 +4,10 @@ import { ChatSection } from './chat';
 
 function ChatsRoute(props) {
     const attachmentFileRef = useRef(null)
+    const [hi, setHi] = useState(0);
 
+    props.userRef.current.setHi = setHi
+    console.log("page update hua")
 
 
 
@@ -54,6 +57,7 @@ function ChatsRoute(props) {
 
     return (
         <aside className="user-vs-chat-container" >
+            
             <ChatSection userRef={props.userRef} chatRef={props.chatRef} socketContainer={props.socketContainer} refreshChatsFlag={props.refreshChatsFlag} chatsDivRef={props.chatsDivRef} textToSpeechContainerRef={props.textToSpeechContainerRef} />
             <form className="formCreateChat" action="" method="post"
                 onSubmit={async (e) => {
@@ -91,7 +95,7 @@ function ChatsRoute(props) {
 
                         const chatField = document.createElement("div")
 
-                        if (props.userRef.current.id !== props.userRef.current.focusedContact.id) {
+                        if (props.userRef.current.username !== props.userRef.current.focusedContact.username) {
                             chatField.style.alignSelf = "flex-end"
                         }
                         else {
@@ -197,7 +201,7 @@ function ChatsRoute(props) {
 
                     const chatField = document.createElement("div")
 
-                    if (props.userRef.current.id !== props.userRef.current.focusedContact.id) {
+                    if (props.userRef.current.username !== props.userRef.current.focusedContact.username) {
                         chatField.style.alignSelf = "flex-end"
                     }
                     else {
@@ -244,7 +248,7 @@ function ChatsRoute(props) {
                                 createdAt: timestamp,
                                 receiver: props.userRef.current.focusedContact,
                                 // sender: { username: props.userRef.current.username, id: props.userRef.current.id, age: props.userRef.current.age, gender: props.userRef.current.gender, country: props.userRef.current.country }
-                                sender: { username: props.userRef.current.username, id: props.userRef.current.id, country: props.userRef.current.country, customAccessToken: props.userRef.current.customAccessToken }
+                                sender: { username: props.userRef.current.username, country: props.userRef.current.country, customAccessToken: props.userRef.current.customAccessToken }
                             }
                         )
                     )
@@ -264,7 +268,7 @@ function ChatsRoute(props) {
 
 
 
-                        style={{ resize: "none" }} placeholder={`Send to ${selectedReceiver}...`} name="message" maxLength="50000">
+                        style={{ resize: "none" }} placeholder={`Send to ${hi}...`} name="message" maxLength="50000">
 
                     </textarea>
                     <button className="attachment" type="button" onClick={(e) => { // this is the file picker trigger button 

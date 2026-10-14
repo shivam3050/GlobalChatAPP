@@ -67,7 +67,7 @@ export const MyRecentContactSection = (props) => {
                                             // sender: { username: props.userRef.current.username, id: props.userRef.current.id, country: props.userRef.current.country },
                                             // receiver: { username: user.username, id: user.id, country: user.country, gender: user.gender },
                                             sender: { username: props.userRef.current.username, id: props.userRef.current.id, country: props.userRef.current.country, customAccessToken : props.userRef.current.customAccessToken },
-                                            receiver: { username: user.username, id: user.id, country: user.country },
+                                            receiver: { username: user.username, country: user.country },
                                             type: "query-message",
                                             queryType: "chat-list-demand"
                                         }

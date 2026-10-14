@@ -7,7 +7,7 @@ import { shortFilename } from "./chat.jsx";
 
 
 export function Home(props) {
-    const [selectedReceiver, setSelectedReceiver] = useState({ username: "", gender: "", age: null, id: "" })
+    const [selectedReceiver, setSelectedReceiver] = useState({ username: "", gender: "", age: null})
     const [headerTitle, setHeaderTitle] = useState("Globet")
     const [toggleSelect, setToggleSelect] = useState(false)
     const inboxIconRef = useRef(null)
@@ -82,7 +82,7 @@ export function Home(props) {
                     userRef.current = {
                         username: data.username,
                         country: data.country,
-                        id: data.id,
+                
                         customAccessToken: data.customAccessToken,
                         availableConnectedUsersUnreadLength: 0,
                         yourGlobalStarAiReference: (data.availableUsers[0]?.username === "StarAI") ?
@@ -94,7 +94,7 @@ export function Home(props) {
                                 unread: false
                             } : {
                                 username: "",
-                                id: "",
+                       
                                 country: "",
                                 transcriptinput: "",
                                 isAiCallingOn: { instance: null, flag: false },
@@ -139,7 +139,7 @@ export function Home(props) {
                         if (data.query === "chat-list-demand") {
 
 
-                            if (data.sender.id !== userRef.current.id) {
+                            if (data.sender.username !== userRef.current.username) {
                                 //this is not for me  which i have queried when click on a user
                                 console.error("query respose is not for me, someone else queried")
                                 return
@@ -219,7 +219,9 @@ export function Home(props) {
                 }
 
                 if (data.type === "message") {
-                    if (data.sender.id === props.userRef.current.id) {
+                    props.userRef.current?.setHi((prev)=> (prev+1))
+                    console.log(props.userRef.current?.setHi)
+                    if (data.sender.username === props.userRef.current.username) {
                         // Message sent by me
                         if (data.status === "failed") {
                             console.error("your msg has been failed", data.msg)
@@ -257,7 +259,7 @@ export function Home(props) {
                         return
                     }
 
-                    if (data.sender.id === props.userRef.current.focusedContact?.id) {
+                    if (data.sender.username === props.userRef.current.focusedContact?.username) {
                         // Message from focused contact
                         if (data.status === "typing" && data.sender.username === "StarAI") {
                             const chatsDiv = props.chatsDivRef.current
@@ -343,7 +345,7 @@ export function Home(props) {
                         return
                     }
 
-                    if (data.sender.id !== props.userRef.current.focusedContact?.id){
+                    if (data.sender.username !== props.userRef.current.focusedContact?.username){
                         // THIS IS THE CONDITION WHERE RECEIVER IS NOT FOCUSED BUT MESSAGE CAME FROM HIM
 
 
@@ -413,7 +415,8 @@ export function Home(props) {
                     //         fileMetaDataInfo: fileMetaDataInfo
                     //     }
                     // ))  this is from server sucees stored file respose
-                    if(data.sender.id === props.userRef.current.id){
+                    
+                    if(data.sender.username === props.userRef.current.username){
                         if (data.status === "failed") {
                             console.error("your msg has been failed", data.msg)
                             const chatsDiv = props.chatsDivRef.current
@@ -451,7 +454,7 @@ export function Home(props) {
                         }
                         return
                     }
-                    if (data.sender.id === props.userRef.current.focusedContact?.id){
+                    if (data.sender.username === props.userRef.current.focusedContact?.username){
                         if (data.status === "success") {
                             // Remove typing indicator
                             if (typingFlagRef.current.element) {
@@ -500,7 +503,7 @@ export function Home(props) {
                         }
                         return
                     }
-                    if (data.sender.id !== props.userRef.current.focusedContact?.id){
+                    if (data.sender.username !== props.userRef.current.focusedContact?.username){
                         if (data.status === "failed"){
                             console.error("this is failed message send by any random or known user who is unfocused or this error you may see when not focused")
                             return
@@ -511,7 +514,7 @@ export function Home(props) {
 
                         for (let i = 0; i < userRef.current.availableConnectedUsers.length; i++) {
 
-                            if (userRef.current.availableConnectedUsers[i].id === data.sender.id) {
+                            if (userRef.current.availableConnectedUsers[i].username === data.sender.username) {
                                 // this condition shows random sender is in your recent contacts already
                                 userRef.current.availableConnectedUsers[i].unread = true
                                 searchFound = true
@@ -593,7 +596,7 @@ export function Home(props) {
                     {
                         type: "query-message",
                         queryType: "refresh-all-user",
-                        sender: { username: props.userRef.current.username, id: props.userRef.current.id }
+                        sender: { username: props.userRef.current.username, customAccessToken: props.userRef.current.customAccessToken }
                     }
                 )
             )
@@ -624,8 +627,8 @@ export function Home(props) {
                             setSelectedReceiver({ username: "", gender: "" });
                             if (props.chatRef.current.availableChats) props.chatRef.current.availableChats = []
                             if (props.chatRef.current.receiver) {
-                                props.chatRef.current.receiver = { username: "", id: "", country: "" }
-                                props.userRef.current.focusedContact = { username: "", id: "", country: "" }
+                                props.chatRef.current.receiver = { username: "", country: "" }
+                                props.userRef.current.focusedContact = { username: "", country: "" }
                             }
                             navigate("/users")
                             setHeaderTitle("Globet")

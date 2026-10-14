@@ -10,6 +10,8 @@ import { countries } from './controllers/allCountries.js';
 
 function App() {
 
+  console.log("home page")
+
   const socketContainer = useRef({})
 
   const [user, setUser] = useState(null)
